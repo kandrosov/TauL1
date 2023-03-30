@@ -149,14 +149,14 @@ public:
         return leptons;
     }
     template<typename FloatVector, typename IntVector1, typename IntVector2, typename IntVector3>
-    static std::vector<GenLepton> fromNanoAOD(const FloatVector& GenPart_pt ,
-                                            const FloatVector& GenPart_eta,
-                                            const FloatVector& GenPart_phi,
-                                            const FloatVector& GenPart_mass,
-                                            const IntVector1& GenPart_genPartIdxMother,
-                                            const IntVector2& GenPart_pdgId,
-                                            const IntVector3& GenPart_statusFlags,
-                                            int event=0){
+    static ROOT::VecOps::RVec<GenLepton> fromNanoAOD(const FloatVector& GenPart_pt,
+                                                     const FloatVector& GenPart_eta,
+                                                     const FloatVector& GenPart_phi,
+                                                     const FloatVector& GenPart_mass,
+                                                     const IntVector1& GenPart_genPartIdxMother,
+                                                     const IntVector2& GenPart_pdgId,
+                                                     const IntVector3& GenPart_statusFlags,
+                                                     int event=0) {
         try {
             std::vector<GenLepton> genLeptons;
             std::set<size_t> processed_particles;
@@ -602,3 +602,14 @@ private:
 
 } // namespace gen_truth
 } // namespace reco_tau
+
+namespace v_ops{
+inline ROOT::VecOps::RVec<reco_tau::gen_truth::LorentzVectorM> visibleP4(
+    const ROOT::VecOps::RVec<reco_tau::gen_truth::GenLepton>& leptons)
+{
+    return ROOT::VecOps::Map(leptons, [](const auto& lep) -> reco_tau::gen_truth::LorentzVectorM {
+        return reco_tau::gen_truth::LorentzVectorM(lep.visibleP4());
+    });
+}
+
+} // namespace v_ops
