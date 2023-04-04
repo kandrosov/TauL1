@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include <thread>
+#include <typeinfo>
 
 #include "EntryQueue.h"
 
@@ -12,8 +13,8 @@ struct Entry {
   bool valid{false};
   std::map<int, int> int_values;
   std::map<int, float> float_values;
-  std::map<int, RVecI> vint_values;
-  std::map<int, RVecF> vfloat_values;
+  std::map<int, std::vector<int>> vint_values;
+  std::map<int, std::vector<float>> vfloat_values;
 
   void Add(int index, float value)
   {
@@ -39,7 +40,7 @@ struct Entry {
 
 private:
   template<typename In, typename Out>
-  void AddToMap(int index, const ROOT::VecOps::RVec<In>& input, std::map<int, ROOT::VecOps::RVec<Out>>& output)
+  void AddToMap(int index, const ROOT::VecOps::RVec<In>& input, std::map<int, std::vector<Out>>& output)
   {
     CheckIndex(index);
     auto& out = output[index];
@@ -57,16 +58,29 @@ private:
 struct StopLoop {};
 
 namespace detail {
-inline void putEntry(std::vector<Entry>& entries, int index) {}
+inline void putEntry(std::vector<Entry>& entries, int index, const RVecB& sel) {}
 
 template<typename T, typename ...Args>
-void putEntry(std::vector<Entry>& entries, int var_index, const ROOT::VecOps::RVec<T>& value, Args&& ...args)
+void putEntry(std::vector<Entry>& entries, int var_index, const RVecB& sel,
+              const ROOT::VecOps::RVec<T>& value, Args&& ...args)
 {
-  if(entries.empty())
-    entries.resize(value.size());
-  for(size_t entry_index = 0; entry_index < value.size(); ++entry_index)
-    entries[entry_index].Add(var_index, value[entry_index]);
-  putEntry(entries, var_index + 1, std::forward<Args>(args)...);
+  if(entries.empty()) {
+    size_t n = 0;
+    for(size_t i = 0; i < sel.size(); ++i) {
+      if(sel[i])
+        ++n;
+    }
+    entries.resize(n);
+  }
+  // std::cout << "putEntry: var_index=" << var_index << " value.size()=" << value.size() << " entries.size()="
+  //           << entries.size() <<  " type_name=" << typeid(T).name() << std::endl;
+  for(size_t entry_index = 0, out_index = 0; entry_index < value.size(); ++entry_index) {
+    if(sel.at(entry_index)) {
+      entries.at(out_index).Add(var_index, value[entry_index]);
+      ++out_index;
+    }
+  }
+  putEntry(entries, var_index + 1, sel, std::forward<Args>(args)...);
 }
 
 } // namespace detail
@@ -88,19 +102,21 @@ struct TupleMaker {
       std::cout << "TupleMaker::process: foreach started." << std::endl;
       try {
         ROOT::RDF::RNode df = df_in;
-        df.Foreach([&](Args ...args) {
+        df.Foreach([&](const Args& ...args) {
           std::vector<Entry> entries;
-          detail::putEntry(entries, 0, std::forward<Args>(args)...);
+          // std::cout << "TupleMaker::process: running detail::putEntry." << std::endl;
+          detail::putEntry(entries, 0, args...);
+          // std::cout << "TupleMaker::process: running detail::putEntry done." << std::endl;
           for(auto& entry : entries) {
             // std::cout << "TupleMaker::process: push entry." << std::endl;
             entry.valid = true;
-            //queue.Push(entry);
             if(!queue.Push(entry)) {
-              // std::cout << "TupleMaker::process: queue is full." << std::endl;
+              std::cout << "TupleMaker::process: queue is full." << std::endl;
               throw StopLoop();
             }
             // std::cout << "TupleMaker::process: push entry done." << std::endl;
           }
+          // std::cout << "TupleMaker::process: Foreach step done." << std::endl;
         }, var_names);
       } catch(StopLoop) {
         // std::cout << "TupleMaker::process: StopLoop exception." << std::endl;
@@ -115,8 +131,8 @@ struct TupleMaker {
         // std::cout << "TupleMaker::process: pop entry " << rdfentry << " index=" << index << " start_idx="
         //           << start_idx << " stop_idx=" << stop_idx << " batch_size=" << batch_size << std::endl;
         if(!queue.Pop(entry)) {
-          std::cout << "TupleMaker::process: queue is empty" << std::endl;
-          throw std::runtime_error("TupleMaker::process: queue is empty");
+          // std::cout << "TupleMaker::process: queue is empty" << std::endl;
+          // throw std::runtime_error("TupleMaker::process: queue is empty");
         }
         // std::cout << "TupleMaker::process: pop entry done " << rdfentry << std::endl;
       } else {

@@ -84,7 +84,10 @@ def ApplyCommonDefinitions(df, deltaR=0.4, isData=False):
            .Define('L1Tau_gen_eta', 'v_ops::eta(L1Tau_gen_p4)') \
            .Define('L1Tau_gen_abs_eta', 'abs(L1Tau_gen_eta)') \
            .Define('L1Tau_gen_phi', 'v_ops::phi(L1Tau_gen_p4)') \
-           .Define('L1Tau_gen_mass', 'v_ops::mass(L1Tau_gen_p4)')
+           .Define('L1Tau_gen_mass', 'v_ops::mass(L1Tau_gen_p4)') \
+           .Define('L1Tau_gen_charge', 'GetGenCharge(L1Tau_type, L1Tau_genLepUniqueIdx, genLeptons)') \
+           .Define('L1Tau_gen_partonFlavour', '''GetGenPartonFlavour(L1Tau_type, L1Tau_genJetUniqueIdx,
+                                                 GenJet_partonFlavour)''')
   return df
 
 

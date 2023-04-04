@@ -23,7 +23,7 @@ class GenParticle {
 public:
     enum class PdgId {
         electron = 11, electron_neutrino = 12, muon = 13, muon_neutrino = 14, tau = 15, tau_neutrino = 16,
-        pi0 = 111, pi = 211, K0_L = 130, K0_S = 310, K0 = 311, K = 321,
+        pi0 = 111, pi = 211, K0_L = 130, K0_S = 310, K0 = 311, K = 321, a1_1260_plus = 20213,
         down = 1, up = 2, strange = 3, charm = 4, bottom = 5, top = 6,
         gluon = 21, photon = 22, Z = 23, W = 24, h0 = 25
     };

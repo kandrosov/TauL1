@@ -12,13 +12,12 @@ if __name__ == "__main__":
   __package__ = os.path.split(file_dir)[-1]
 
 from .AnalysisTools import *
+from .MixStep import MixStep
 
 import ROOT
 ROOT.gROOT.SetBatch(True)
 ROOT.EnableThreadSafety()
 
-class MixStep:
-  pass
 
 def GetBinContent(hist, pt, eta):
   x_axis = hist.GetXaxis()
@@ -30,37 +29,11 @@ def GetBinContent(hist, pt, eta):
 def analyse_mix(cfg_file):
   with open(cfg_file, 'r') as f:
     cfg = yaml.safe_load(f)
-  mix_steps = []
-  pt_bin_edges = cfg['bin_edges']['pt']
-  eta_bin_edges = cfg['bin_edges']['eta']
-  batch_size = 0
-  for bin_idx, bin in enumerate(cfg['bins']):
-    if len(bin['counts']) != len(pt_bin_edges) - 1:
-      raise ValueError("Number of counts does not match number of pt bins")
-    for pt_bin_idx, count in enumerate(bin['counts']):
-      if count == 0: continue
-      step = MixStep()
-      step.input_setups = bin['input_setups']
-      step.inputs = []
-      for input_setup in bin['input_setups']:
-        step.inputs.extend(cfg['inputs'][input_setup])
-      selection = cfg['bin_selection'].format(pt_low=pt_bin_edges[pt_bin_idx],
-                                              pt_high=pt_bin_edges[pt_bin_idx + 1],
-                                              eta_low=eta_bin_edges[bin['eta_bin']],
-                                              eta_high=eta_bin_edges[bin['eta_bin'] + 1])
-      step.selection = f'L1Tau_type == static_cast<int>(TauType::{bin["tau_type"]}) && ({selection})'
-      step.tau_type = bin['tau_type']
-      step.eta_bin = bin['eta_bin']
-      step.pt_bin = pt_bin_idx
-      step.bin_idx = bin_idx
-      step.start_idx = batch_size
-      step.stop_idx = batch_size + count
-      step.count = count
-      mix_steps.append(step)
-      batch_size += count
+  mix_steps, batch_size = MixStep.Load(cfg)
   print(f'Number of mix steps: {len(mix_steps)}')
   print(f'Batch size: {batch_size}')
   step_stat = np.zeros(len(mix_steps))
+  step_stat_split = { 'tau': np.zeros(len(mix_steps)), 'jet': np.zeros(len(mix_steps)), 'e': np.zeros(len(mix_steps)) }
   n_taus = { }
   n_taus_batch = { }
   for step_idx, step in enumerate(mix_steps):
@@ -75,8 +48,8 @@ def analyse_mix(cfg_file):
     n_taus_batch[step.tau_type] = step.count + n_taus_batch.get(step.tau_type, 0)
     n_batches = math.floor(n_available / step.count)
     step_stat[step_idx] = n_batches
+    step_stat_split[step.tau_type][step_idx] = n_batches
   step_idx = np.argmin(step_stat)
-  step = mix_steps[step_idx]
   print(f'Total number of samples = {sum(n_taus.values())}: {n_taus}')
   n_taus_active = { name: x * step_stat[step_idx] for name, x in n_taus_batch.items()}
   print(f'Total number of used samples = {sum(n_taus_active.values())}: {n_taus_active}')
@@ -87,15 +60,12 @@ def analyse_mix(cfg_file):
   print(f'Relative number of samples: {n_taus_rel}')
   print('Step with minimum number of batches:')
   print(f'n_batches: {step_stat[step_idx]}')
-  print(f'taus/batch: {step.count}')
-  print(f'inputs: {step.input_setups}')
-  print(f'eta bin: {step.eta_bin}')
-  print(f'pt bin: {step.pt_bin}')
-  print(f'bin idx: {step.bin_idx}')
-  print(f'tau_type: {step.tau_type}')
-  print(f'selection: {step.selection}')
-
-
+  mix_steps[step_idx].Print()
+  for name, stat in step_stat_split.items():
+    step_idx = np.argmax(stat)
+    print(f'Step with maximum number of batches for {name}:')
+    print(f'n_batches: {stat[step_idx]}')
+    mix_steps[step_idx].Print()
 
 if __name__ == "__main__":
   import argparse
