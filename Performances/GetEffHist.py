@@ -28,9 +28,6 @@ tower_vars = [
 all_vars = event_vars + gen_vars + reco_vars + hw_vars + tower_vars
 meta_vars = event_vars + gen_vars + reco_vars + hw_vars
 
-
-
-
 def get_index(name):
   return meta_vars.index(name)
 
