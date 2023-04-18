@@ -1,3 +1,10 @@
 *.pdf
 /output
 __pycache__
+/data
+/vhdl/*.cf
+*.png
+skim*/
+GluGlu*/
+*.txt
+models/
