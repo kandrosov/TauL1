@@ -4,7 +4,7 @@ from tensorflow.keras.layers import Dense, Conv2D, Flatten
 
 
 input_idx = 0
-dataset = tf.data.Dataset.load(f'taus_{input_idx}', compression='GZIP')
+dataset = tf.data.Dataset.load(f'/eos/cms/store/group/phys_tau/kandroso/Run3_HLT/L1/skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
 
 class TauL1Model(keras.Model):
   def __init__(self, *args, **kwargs):
