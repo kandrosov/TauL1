@@ -1,20 +1,20 @@
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import Dense, Conv2D, Flatten
-
+import os
 
 input_idx = 0
-dataset = tf.data.Dataset.load(f'taus_{input_idx}', compression='GZIP')
+dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
 
 class TauL1Model(keras.Model):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.conv = [
-      Conv2D(8, (1, 1), activation='relu'),
-      Conv2D(8, (1, 1), activation='relu'),
-      Conv2D(8, (3, 3), activation='relu'),
-      Conv2D(8, (3, 3), activation='relu'),
-      Conv2D(8, (2, 2), activation='relu'),
+      Conv2D(32, (1, 1), activation='relu'),
+      Conv2D(32, (1, 1), activation='relu'),
+      Conv2D(16, (3, 3), activation='relu'),
+      Conv2D(16, (3, 3), activation='relu'),
+      Conv2D(16, (1, 1), activation='relu'),
     ]
     self.flatten = Flatten()
     self.dense = [
@@ -37,7 +37,7 @@ model.compile(optimizer='adam', loss='binary_crossentropy', weighted_metrics=['a
 
 
 def to_train(x, y, w, meta):
-  return x[:4], y, w
+  return x[:,:,:,:4], y, w
 
 ds_train_val = dataset.batch(300).map(to_train)
 n_batches = ds_train_val.cardinality().numpy()
@@ -51,4 +51,10 @@ for x, y, w in ds_train:
 model.summary()
 
 model.fit(ds_train, validation_data=ds_val, epochs=10, verbose=1)
-model.save('models/model_v0')
+k = 0
+dirFile = f'models/model_v{k}'
+while(os.path.isdir(dirFile)):
+  k+=1
+  dirFile = f'models/model_v{k}' 
+print(dirFile)
+model.save(dirFile)

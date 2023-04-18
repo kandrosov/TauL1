@@ -42,7 +42,7 @@ T1 DeltaR(T1 eta1, T1 phi1, T2 eta2, T2 phi2){
 }
 ''')
 
-sample_path = "/eos/cms/store/group/phys_tau/kandroso/Run3_HLT/prod_v1/GluGluHToTauTau_M-125"
+sample_path = "/home/valeria/TauL1/GluGluHToTauTau_M-125"
 files = '*.root'
 #files = 'nano_2.root'
 df = ROOT.RDataFrame("Events", os.path.join(sample_path, files))
