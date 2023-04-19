@@ -41,7 +41,7 @@ def get_y_info(x,y,w,meta):
     return y[:276]
 
 def get_hw_info(x,y,w,meta):
-    return meta[:276, 'L1Tau_hwIso']
+    return meta[:276, get_index('L1Tau_hwIso')]
 
 def add_prediction(input_idx,var,x_bins, model='model_v1'):
 	model = keras.models.load_model(f'models/{model}')
