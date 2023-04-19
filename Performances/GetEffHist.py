@@ -40,48 +40,65 @@ def get_x_var(x, y, w, meta):
 def get_y_info(x,y,w,meta):
     return y[:276]
 
+def get_hw_info(x,y,w,meta):
+    return meta[:276, 'L1Tau_hwIso']
+
 def add_prediction(input_idx,var,x_bins, model='model_v1'):
 	model = keras.models.load_model(f'models/{model}')
 	dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
 	ds_pred = dataset.batch(300).map(to_pred)
-	pred = model.predict(ds_pred) 
+	pred = model.predict(ds_pred)
 	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).as_numpy_iterator()))
 	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).as_numpy_iterator()))
-	all_var = np.vstack((var_den_presel[:], pred[:,0], gen_truth[:,0])).T
+	hw_iso = np.concatenate(list(dataset.batch(300).map(get_hw_info).as_numpy_iterator()))
+	all_var = np.vstack((var_den_presel[:], pred[:,0], gen_truth[:,0], hw_iso[:, 0])).T
 	condition1 = all_var[:,2]==1
-	condition2 = all_var[:,1]>0.40430108# 0.6482158 
+	condition2 = all_var[:,1]>0.40430108# 0.6482158
+	condition3 = all_var[:,3]==1
 	condition = condition1 & condition2
+	condition_iso = condition1 & condition3
 	var_den = all_var[condition1][:,0]
 	var_num = all_var[condition][:,0]
-	print(var_num.min(), var_num.max()) 
+	var_num_iso = all_car[condition_iso][:,0]
+	print(var_num.min(), var_num.max())
 	print(f"len of {var} num = {len(var_num)}, len of {var} den = {len(var_den)}")
 	import matplotlib.pyplot as plt
+	val_of_bins_num_iso, edges_of_bins_num_iso, patches_num_iso = plt.hist(var_num_iso, x_bins, range=(0,250), histtype='step', label="num")
 	val_of_bins_num, edges_of_bins_num, patches_num = plt.hist(var_num, x_bins, range=(0,250), histtype='step', label="num")
 	val_of_bins_den, edges_of_bins_den, patches_den = plt.hist(var_den, x_bins, range=(0,250), histtype='step', label="den")
 	print("bins:", edges_of_bins_num)
 	ratio = np.divide(val_of_bins_num,
 		          val_of_bins_den,
 		          where=(val_of_bins_den != 0))
+	ratio_iso = np.divide(val_of_bins_num_iso,
+		          val_of_bins_den,
+		          where=(val_of_bins_den != 0))
 
 	print("ratio:", ratio)
+	print("ratio_iso:", ratio_iso)
 
-	fig = plt.figure(figsize=(10.,6.)) 
+	fig = plt.figure(figsize=(10.,6.))
 	error = np.divide(val_of_bins_num * np.sqrt(val_of_bins_den) + val_of_bins_den * np.sqrt(val_of_bins_num),
 			          np.power(val_of_bins_den, 2),
 			          where=(val_of_bins_den != 0))
 
+	error_iso = np.divide(val_of_bins_num_iso * np.sqrt(val_of_bins_den) + val_of_bins_den * np.sqrt(val_of_bins_num_iso),
+			          np.power(val_of_bins_den, 2),
+			          where=(val_of_bins_den != 0))
 	#print("error:", error)
 	# --- efficiency VS variable
 	plt.ylabel('efficiency')
 	plt.xlabel(f'{var}')
 
 	bincenter = 0.5 * (edges_of_bins_num[1:] + edges_of_bins_num[:-1])
-	plt.errorbar(bincenter, ratio, yerr=error, fmt='.', color='r')
+	bincenter_iso = 0.5 * (edges_of_bins_num_iso[1:] + edges_of_bins_num_iso[:-1])
+	plt.errorbar(bincenter, ratio, yerr=error, fmt='.', color='b')
+	plt.errorbar(bincenter_iso, ratio_iso, yerr=error, fmt='.', color='r')
 
-	
+
 	plt.savefig(f"plots/{var}_efficiency_1.png")
-	
-	
+
+
 
 var = 'L1Tau_gen_pt'
 x_bins=[0,40,60,80,100,150,200,250,300,500]
