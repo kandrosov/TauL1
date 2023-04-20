@@ -1,9 +1,6 @@
-import tensorflow as tf
-from tensorflow import keras
-from sklearn.metrics import roc_curve
 import numpy as np
-
-
+import tensorflow as tf
+import math 
 event_vars = [
   'run', 'luminosityBlock', 'event', 'nPV', 'step_idx'
 ]
@@ -32,17 +29,21 @@ def get_index(name):
   return meta_vars.index(name)
 
 def get_weight(x,y,w,meta):
-    return w[:]
+    return w[:276]
+
+def get_gen_pt(x,y,w,meta):
+    return meta[:276, get_index('L1Tau_gen_pt')]-20
 
 def reweight(x,y,w,meta):
-    a = 0.1
+    a = 5.5
     b = 1.5
     gen_pt0 = 20
-    return w[:] * ( a (meta[:276,get_index('L1Tau_gen_pt')] - 20 ) + b)
-
+    w = w *( a * tf.experimental.numpy.log10(meta[:,get_index('L1Tau_gen_pt')] / gen_pt0 ) + b)
+    #w = w *( a * (meta[:,get_index('L1Tau_gen_pt')] - gen_pt0 ) + b)
+    return w[:]
 input_idx = 2
 dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
-old_weight = np.concatenate(list(dataset.batch(300).map(get_weight).take(10)as_numpy_iterator()))
-print(old_weight)
-#new_weight = np.concatenate(list(dataset.batch(300).map(reweight).as_numpy_iterator()))
-#print()
+old_weight = np.concatenate(list(dataset.batch(300).map(get_weight).take(10).as_numpy_iterator()))
+new_weight = np.concatenate(list(dataset.batch(300).map(reweight).take(10).as_numpy_iterator()))
+gen_pt = np.concatenate(list(dataset.batch(300).map(get_gen_pt).take(10).as_numpy_iterator()))
+print(old_weight, gen_pt, new_weight)

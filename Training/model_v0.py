@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import Dense, Conv2D, Flatten
 import os
-
+from reweight import *
 input_idx = 0
 dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
 
@@ -10,11 +10,11 @@ class TauL1Model(keras.Model):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.conv = [
-      Conv2D(32, (1, 1), activation='relu'),
-      Conv2D(32, (1, 1), activation='relu'),
       Conv2D(16, (3, 3), activation='relu'),
       Conv2D(16, (3, 3), activation='relu'),
-      Conv2D(16, (1, 1), activation='relu'),
+      Conv2D(8, (1, 1), activation='relu'),
+      Conv2D(8, (1, 1), activation='relu'),
+      Conv2D(8, (1, 1), activation='relu'),
     ]
     self.flatten = Flatten()
     self.dense = [
@@ -44,6 +44,8 @@ n_batches = ds_train_val.cardinality().numpy()
 n_batches_train = int(n_batches * 0.8)
 ds_train = ds_train_val.take(n_batches_train)
 ds_val = ds_train_val.skip(n_batches_train)
+
+dataset.batch(300).map(reweight)
 
 for x, y, w in ds_train:
   model(x)
