@@ -54,20 +54,21 @@ class TauType:
 
 
 def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
-	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).take(10).as_numpy_iterator()))
-	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).take(10).as_numpy_iterator()))
-	tau_type = np.concatenate(list(dataset.batch(300).map(get_tau_info).take(10).as_numpy_iterator()))
-	hw_iso = np.concatenate(list(dataset.batch(300).map(get_hw_info).take(10).as_numpy_iterator()))
-	all_var = np.vstack((var_den_presel[:], pred[:,0], gen_truth[:,0], hw_iso[:, 0], tau_type[:,0])).T
+	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).as_numpy_iterator()))
+	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).as_numpy_iterator()))
+	tau_type = np.concatenate(list(dataset.batch(300).map(get_tau_info).as_numpy_iterator()))
+	hw_iso = np.concatenate(list(dataset.batch(300).map(get_hw_info).as_numpy_iterator()))
+	print(hw_iso.shape,tau_type.shape)
+	all_var = np.vstack((var_den_presel[:], pred[:,0], gen_truth[:,0], hw_iso[:], tau_type[:])).T
 	condition_type = all_var[:,4]==getattr(TauType, required_type)
 	condition_gen_truth = all_var[:,2]==1
 	condition_thr = all_var[:,1]> thr #0.40430108# 0.6482158
 	condition_hwIso = all_var[:,3]==1
 	condition_nn_based =  condition_type & condition_thr
 	condition_cut_based = condition_type & condition_hwIso
-	var_den = all_var[condition1][:,0]
-	var_num = all_var[condition][:,0]
-	var_num_iso = all_car[condition_iso][:,0]
+	var_den = all_var[condition_type][:,0]
+	var_num = all_var[condition_nn_based][:,0]
+	var_num_iso = all_var[condition_cut_based][:,0]
 	print(var_num.min(), var_num.max())
 	print(f"len of {var} num = {len(var_num)}, len of {var} den = {len(var_den)}")
 	import matplotlib.pyplot as plt
