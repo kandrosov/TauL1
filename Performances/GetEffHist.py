@@ -102,4 +102,4 @@ def add_prediction(input_idx,var,x_bins, model='model_v4'):
 
 var = 'L1Tau_gen_pt'
 x_bins=[0,40,60,80,100,150,200,250,300,500]
-add_prediction(2, var, x_bins, 'model_v8')
+add_prediction(2, var, x_bins, 'model_v9')
