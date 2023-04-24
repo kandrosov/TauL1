@@ -120,7 +120,7 @@ args = parser.parse_args()
 x_bins=[0,40,60,80,100,150,200,250,300,500]
 
 model = keras.models.load_model(f'models/model_v{args.model_version}')
-dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{dataset}', compression='GZIP')
+dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{args.dataset}', compression='GZIP')
 ds_pred = dataset.batch(300).map(to_pred)
 pred = model.predict(ds_pred)
 for tau_type in ['e', 'jet', 'tau']:
