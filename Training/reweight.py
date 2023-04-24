@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import sys
-import math 
+import math
 event_vars = [
   'run', 'luminosityBlock', 'event', 'nPV', 'step_idx'
 ]
@@ -37,7 +37,7 @@ def get_weight(x,y,w,meta):
 
 def get_gen_pt(x,y,w,meta):
     return 5.5*tf.experimental.numpy.log10(meta[:276, get_index('L1Tau_gen_pt')]/20)+1.5
-   
+
 def reweight(x,y,w,meta):
     a = 5.5
     b = 1.5
@@ -46,9 +46,9 @@ def reweight(x,y,w,meta):
     print(f"meta shape is {meta.shape}")
     k = tf.math.log(meta[:, get_index("L1Tau_gen_pt")]/20.)/math.log(10)
     #w = w *( a * (meta[:,get_index('L1Tau_gen_pt')] - gen_pt0 ) + b)
-    w = w*( a * k + b)
-    return w[:276] 
-    
+    w = w[:,0]*( a * k + b)
+    return w[:276]
+
 
 def get_weight_shape(x,y,w,meta):
     print(f"w shape is {w.shape}")
@@ -59,6 +59,8 @@ dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{input_idx}', compression='G
 old_weight = np.concatenate(list(dataset.batch(300).map(get_weight).take(10).as_numpy_iterator()))
 
 new_weight = np.concatenate(list(dataset.batch(300).map(reweight).take(10).as_numpy_iterator()))
+
+'''
 print("new_weight_shape")
 print(type(new_weight), new_weight.shape)
 print("old_weight shape")
@@ -76,3 +78,4 @@ print(type(old_weight), old_weight.shape)
 #
 #
 
+'''
