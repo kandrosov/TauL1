@@ -35,7 +35,7 @@ def to_pred(x, y, w, meta):
     return x[:276, :, :, :4]
 
 def get_x_var(x, y, w, meta):
-    return meta[:276, get_index(var)]
+    return meta[:276, get_index(args.var)]
 
 def get_y_info(x,y,w,meta):
     return y[:276]
@@ -54,10 +54,10 @@ class TauType:
 
 
 def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
-	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).as_numpy_iterator()))
-	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).as_numpy_iterator()))
-	tau_type = np.concatenate(list(dataset.batch(300).map(get_tau_info).as_numpy_iterator()))
-	hw_iso = np.concatenate(list(dataset.batch(300).map(get_hw_info).as_numpy_iterator()))
+	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).take(10).as_numpy_iterator()))
+	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).take(10).as_numpy_iterator()))
+	tau_type = np.concatenate(list(dataset.batch(300).map(get_tau_info).take(10).as_numpy_iterator()))
+	hw_iso = np.concatenate(list(dataset.batch(300).map(get_hw_info).take(10).as_numpy_iterator()))
 	all_var = np.vstack((var_den_presel[:], pred[:,0], gen_truth[:,0], hw_iso[:, 0], tau_type[:,0])).T
 	condition_type = all_var[:,4]==getattr(TauType, required_type)
 	condition_gen_truth = all_var[:,2]==1
