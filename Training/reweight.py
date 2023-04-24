@@ -56,9 +56,9 @@ def get_weight_shape(x,y,w,meta):
 input_idx = 2
 dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
 old_weight = np.concatenate(list(dataset.batch(300).map(get_weight).take(10).as_numpy_iterator()))
-old_weight = np.concatenate(list(dataset.batch(300).map(get_weight_shape).take(10).as_numpy_iterator()))
 
 new_weight = np.concatenate(list(dataset.batch(300).map(reweight).take(10).as_numpy_iterator()))
+print("new_weight_shape")
 print(type(new_weight), new_weight.shape)
 print("old_weight shape")
 print(type(old_weight), old_weight.shape)
