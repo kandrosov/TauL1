@@ -44,8 +44,9 @@ def reweight(x,y,w,meta):
     gen_pt0 = 20
     print(f"w shape is {w.shape}")
     print(f"meta shape is {meta.shape}")
+    k = tf.math.log(meta[:, get_index("L1Tau_gen_pt")]/20.)/math.log(10)
     #w = w *( a * (meta[:,get_index('L1Tau_gen_pt')] - gen_pt0 ) + b)
-    w = w*( a * tf.experimental.numpy.log10( meta[:,get_index('L1Tau_gen_pt')]/20) + b)
+    w = w*( a * k + b)
     return w[:276] 
     
 
