@@ -11,24 +11,18 @@ def get_x_var(x, y, w, meta):
     return meta[:276, get_index(args.var)]
 
 
-class TauType:
-  ele = 0
-  tau = 2
-  jet = 3
-
-
-
 def getInfo(dataset,pred, var ,thr,required_type='tau'):
+	print(f"required type is {required_type}")
 	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).as_numpy_iterator()))
 	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).as_numpy_iterator()))
 	tau_type = np.concatenate(list(dataset.batch(300).map(get_tauType_info).as_numpy_iterator()))
 	hw_iso = np.concatenate(list(dataset.batch(300).map(to_hwIso).as_numpy_iterator()))
 	all_var = np.vstack((var_den_presel[:], pred[:,0], gen_truth[:,0], hw_iso[:], tau_type[:])).T
-	print(len(all_var[all_var[:,4]==2]))
+	#all_var = np.vstack((var_den_presel[:], gen_truth[:,0],tau_type[:])).T
 	condition_type = all_var[:,4]==getattr(TauType, required_type)
 	condition_gen_truth = all_var[:,2]==1
 	condition_thr = all_var[:,1]> thr #0.40430108# 0.6482158
-	condition_hwIso = all_var[:,3]==1 if required_type=='tau'else all_var[:,3]==0
+	condition_hwIso = all_var[:,3]==1 if required_type=='tau' else all_var[:,3]==0
 	condition_nn_based =  condition_type & condition_thr
 	condition_cut_based = condition_type & condition_hwIso
 	var_den = all_var[condition_type][:,0]
@@ -54,6 +48,6 @@ model = keras.models.load_model(f'models/model_v{args.model_version}')
 dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{args.dataset}', compression='GZIP')
 ds_pred = dataset.batch(300).map(to_pred)
 pred = model.predict(ds_pred)
-print(pred.shape)
-tau_type='tau'
-getInfo(dataset,pred, args.var ,x_bins ,args.threshold,tau_type)
+for tau_type in ['e', 'tau', 'jet']:
+	print(f"tauType is {tau_type}")
+	getInfo(dataset,pred, args.var ,args.threshold,tau_type)

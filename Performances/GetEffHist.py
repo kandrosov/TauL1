@@ -80,7 +80,7 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=False, type=int, default = 2)
 parser.add_argument('--threshold', required=False, type=float, default = 0.40430108)
-parser.add_argument('--model_version', required=False, type=int, default = 7)
+parser.add_argument('--model_version', required=False, type=int, default = 8)
 parser.add_argument('--var', required=False, type=str, default = 'L1Tau_gen_pt')
 args = parser.parse_args()
 
