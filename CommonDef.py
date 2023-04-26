@@ -31,18 +31,18 @@ def get_index(name):
   return meta_vars.index(name)
 
 def to_pred(x, y, w, meta):
-    return x[:276, :, :, :4]
+    return x[:, :, :, :4]
 
 
 def to_hwIso(x,y,w,meta):
-    return meta[:276, get_index('L1Tau_hwIso')]
+    return meta[:, get_index('L1Tau_hwIso')]
 
 def get_y_info(x,y,w,meta):
-    return y[:276]
+    return y
 
 
 def to_gen(x, y, w, meta):
-  return y[:276]
+  return y
 
 def get_tauType_info(x,y,w,meta):
-    return meta[:276, get_index('L1Tau_type')]
+    return meta[:, get_index('L1Tau_type')]

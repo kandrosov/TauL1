@@ -8,7 +8,7 @@ from CommonDef import *
 
 
 def get_x_var(x, y, w, meta):
-    return meta[:276, get_index(args.var)]
+    return meta[:, get_index(args.var)]
 
 
 class TauType:
@@ -16,6 +16,33 @@ class TauType:
   tau = 2
   jet = 3
 
+
+def add_roc(dataset,pred,model_number):
+	y = np.concatenate(list(dataset.batch(300).map(to_gen).as_numpy_iterator()))
+	tau_type = np.concatenate(list(dataset.batch(300).map(get_tauType_info).as_numpy_iterator()))
+	hwIso = np.concatenate(list(dataset.batch(300).map(to_hwIso).as_numpy_iterator()))
+	hwIso_noEle=hwIso[tau_type[:]!=TauType.e]
+	y_noEle=y[tau_type[:]!=TauType.e]	
+	fpr, tpr, threasholds = roc_curve(y_noEle, pred)
+	hw_fpr, hw_tpr, hw_threasholds = roc_curve(y, hwIso_noEle)
+	print(f'hw_fpr = {hw_fpr} \nhw_tpr={hw_tpr} \nhw_thresholds={hw_threasholds}')
+	for fpr_idx in range(0, len(fpr)):
+	  if(abs(fpr[fpr_idx]-hw_fpr[1])<0.001):
+	    print(abs(fpr[fpr_idx]-hw_fpr[1]), fpr[fpr_idx], hw_fpr[1], threasholds[fpr_idx])
+	#for tpr_idx in range(0, len(tpr)):
+	#  if(tpr[tpr_idx]-hw_tpr[1]<0.00000001):
+	#    print(tpr[tpr_idx], hw_tpr[1], threasholds[tpr_idx])
+
+	with PdfPages(f'plots/roc_model_v{model_number}.pdf') as pdf:
+  		fig, ax = plt.subplots(1, 1, figsize=(7, 7))
+  		ax.plot(tpr, fpr, )
+  		ax.errorbar(hw_tpr, hw_fpr, fmt='o', markersize=2, color='red')
+  		ax.set_xlabel('true tau_h efficiency')
+  		ax.set_ylabel('jet->tau efficiency')
+  		plt.subplots_adjust(hspace=0)
+  		pdf.savefig(fig, bbox_inches='tight')
+
+	
 
 
 def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
@@ -94,6 +121,7 @@ pred = model.predict(ds_pred)
 print(pred.shape)
 tau_type='tau'
 add_prediction(dataset,pred, args.var ,x_bins ,args.threshold,tau_type)
+#add_roc(dataset,pred,args.model_version)
 '''
 for tau_type in ['e', 'jet', 'tau']:
     add_prediction(dataset,pred, args.var ,x_bins ,args.threshold,tau_type)
