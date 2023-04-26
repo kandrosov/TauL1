@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import Dense, Conv2D, Flatten
 import os
-from reweight import *
+from CommonDef import *
 input_idx = 0
 dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
 
@@ -37,6 +37,12 @@ model.compile(optimizer='adam', loss='binary_crossentropy', weighted_metrics=['a
 
 
 def to_train(x, y, w, meta):
+  a = 5.5
+  b = 1.5
+  gen_pt0 = 20
+  k = tf.math.log(meta[:, get_index("L1Tau_gen_pt")]/20.)/math.log(10)
+  #w = w *( a * (meta[:,get_index('L1Tau_gen_pt')] - gen_pt0 ) + b)
+  w = w[:,0]*( a * k + b)
   return x[:,:,:,:4], y, w
 
 ds_train_val = dataset.batch(300).map(to_train)

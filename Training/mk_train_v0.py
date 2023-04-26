@@ -3,41 +3,14 @@ import numpy as np
 import awkward as ak
 import os
 import gc
+from CommonDef import *
 
 os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 import tensorflow as tf
 
-class TauType:
-  e = 0
-  tau = 2
-  jet = 3
 
 input_idx = 0
 stop_entry = None
-
-event_vars = [
-  'run', 'luminosityBlock', 'event', 'nPV', 'step_idx'
-]
-
-gen_vars = [
-  'L1Tau_type', 'L1Tau_gen_pt', 'L1Tau_gen_eta', 'L1Tau_gen_phi', 'L1Tau_gen_mass',
-  'L1Tau_gen_charge', 'L1Tau_gen_partonFlavour'
-]
-
-reco_vars = [
-  'L1Tau_pt', 'L1Tau_eta', 'L1Tau_phi', 'L1Tau_hwIso', 'L1Tau_isoEt', 'L1Tau_nTT', 'L1Tau_rawEt',
-]
-
-hw_vars = [
-  'L1Tau_hwPt', 'L1Tau_hwEta', 'L1Tau_hwPhi', 'L1Tau_towerIEta', 'L1Tau_towerIPhi', 'L1Tau_hwEtSum'
-]
-
-tower_vars = [
-  'L1Tau_tower_relEta', 'L1Tau_tower_relPhi', 'L1Tau_tower_hwEtEm', 'L1Tau_tower_hwEtHad', 'L1Tau_tower_hwPt',
-]
-
-all_vars = event_vars + gen_vars + reco_vars + hw_vars + tower_vars
-meta_vars = event_vars + gen_vars + reco_vars + hw_vars
 
 def get_inputs():
   file = uproot.open(f'skim_v1/taus_{input_idx}.root')

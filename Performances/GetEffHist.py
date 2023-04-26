@@ -4,48 +4,12 @@ from tensorflow import keras
 import numpy as np
 import statsmodels.stats.proportion as ssp
 import argparse
+from CommonDef import *
 
-event_vars = [
-  'run', 'luminosityBlock', 'event', 'nPV', 'step_idx'
-]
-
-gen_vars = [
-  'L1Tau_type', 'L1Tau_gen_pt', 'L1Tau_gen_eta', 'L1Tau_gen_phi', 'L1Tau_gen_mass',
-  'L1Tau_gen_charge', 'L1Tau_gen_partonFlavour'
-]
-
-reco_vars = [
-  'L1Tau_pt', 'L1Tau_eta', 'L1Tau_phi', 'L1Tau_hwIso', 'L1Tau_isoEt', 'L1Tau_nTT', 'L1Tau_rawEt',
-]
-
-hw_vars = [
-  'L1Tau_hwPt', 'L1Tau_hwEta', 'L1Tau_hwPhi', 'L1Tau_towerIEta', 'L1Tau_towerIPhi', 'L1Tau_hwEtSum'
-]
-
-tower_vars = [
-  'L1Tau_tower_relEta', 'L1Tau_tower_relPhi', 'L1Tau_tower_hwEtEm', 'L1Tau_tower_hwEtHad', 'L1Tau_tower_hwPt',
-]
-
-all_vars = event_vars + gen_vars + reco_vars + hw_vars + tower_vars
-meta_vars = event_vars + gen_vars + reco_vars + hw_vars
-
-def get_index(name):
-  return meta_vars.index(name)
-
-def to_pred(x, y, w, meta):
-    return x[:276, :, :, :4]
 
 def get_x_var(x, y, w, meta):
     return meta[:276, get_index(args.var)]
 
-def get_y_info(x,y,w,meta):
-    return y[:276]
-
-def get_hw_info(x,y,w,meta):
-    return meta[:276, get_index('L1Tau_hwIso')]
-
-def get_tau_info(x,y,w,meta):
-    return meta[:276, get_index('L1Tau_type')]
 
 class TauType:
   ele = 0
@@ -57,8 +21,8 @@ class TauType:
 def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).as_numpy_iterator()))
 	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).as_numpy_iterator()))
-	tau_type = np.concatenate(list(dataset.batch(300).map(get_tau_info).as_numpy_iterator()))
-	hw_iso = np.concatenate(list(dataset.batch(300).map(get_hw_info).as_numpy_iterator()))
+	tau_type = np.concatenate(list(dataset.batch(300).map(get_tauType_info).as_numpy_iterator()))
+	hw_iso = np.concatenate(list(dataset.batch(300).map(to_hwIso).as_numpy_iterator()))
 	#print(hw_iso.shape,tau_type.shape)
 	all_var = np.vstack((var_den_presel[:], pred[:,0], gen_truth[:,0], hw_iso[:], tau_type[:])).T
 	print(len(all_var[all_var[:,4]==2]))
@@ -74,13 +38,14 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 	#print(var_num.min(), var_num.max())
 	print(f"len of {var} num iso = {len(var_num_iso)}, len of {var} den = {len(var_den)}")
 	print(f"len of {var} num = {len(var_num)}, len of {var} den = {len(var_den)}")
-	
+
 	import matplotlib.pyplot as plt
-	val_of_bins_num_iso, edges_of_bins_num_iso, patches_num_iso = plt.hist(var_num_iso, x_bins, range=(x_bins.min(),x_bin.max()), histtype='step', label="num_iso")
-	val_of_bins_num, edges_of_bins_num, patches_num = plt.hist(var_num, x_bins, range=(x_bins.min(),x_bin.max()), histtype='step', label="num")
+
+	val_of_bins_num_iso, edges_of_bins_num_iso, patches_num_iso = plt.hist(var_num_iso, x_bins, range=(var_num.min(),x_bin.max()), histtype='step', label="num_iso")
+	val_of_bins_num, edges_of_bins_num, patches_num = plt.hist(var_num, x_bins, range=(var_num.min(),x_bin.max()), histtype='step', label="num")
 	#print("a")
-	val_of_bins_den, edges_of_bins_den, patches_den = plt.hist(var_den, x_bins, range=(x_bins.min(),x_bin.max()), histtype='step', label="den")
-	
+	val_of_bins_den, edges_of_bins_den, patches_den = plt.hist(var_den, x_bins, range=(var_num.min(),x_bin.max()), histtype='step', label="den")
+
 	print("bins:", edges_of_bins_num)
 	ratio = np.divide(val_of_bins_num,
 		          val_of_bins_den,
@@ -93,14 +58,9 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 	print("ratio_iso:", ratio_iso)
 
 	fig = plt.figure(figsize=(10.,6.))
- 	#ssp.proportion_confint(num, den, alpha=1-0.68, method='beta')
-	error = np.divide(val_of_bins_num * np.sqrt(val_of_bins_den) + val_of_bins_den * np.sqrt(val_of_bins_num),
-			          np.power(val_of_bins_den, 2),
-			          where=(val_of_bins_den != 0))
+	error_u,error_d = ssp.proportion_confint(val_of_bins_num,val_of_bins_den,alpha=1-0.68,method='beta')
+	error_iso_u,error_iso_d = ssp.proportion_confint(val_of_bins_num_iso,val_of_bins_den,alpha=1-0.68,method='beta')
 
-	error_iso = np.divide(val_of_bins_num_iso * np.sqrt(val_of_bins_den) + val_of_bins_den * np.sqrt(val_of_bins_num_iso),
-			          np.power(val_of_bins_den, 2),
-			          where=(val_of_bins_den != 0))
 	#print("error:", error)
 	# --- efficiency VS variable
 	plt.ylabel('efficiency')
@@ -108,8 +68,8 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 
 	bincenter = 0.5 * (edges_of_bins_num[1:] + edges_of_bins_num[:-1])
 	bincenter_iso = 0.5 * (edges_of_bins_num_iso[1:] + edges_of_bins_num_iso[:-1])
-	plt.errorbar(bincenter, ratio, yerr=error, fmt='.', color='b')
-	plt.errorbar(bincenter_iso, ratio_iso, yerr=error, fmt='.', color='r')
+	plt.errorbar(bincenter, ratio, uplims=error_u,lolims=error_d, color='b', markersize=8, marker='o', linestyle='none')
+	plt.errorbar(bincenter_iso, ratio_iso, uplims=error_iso_u,lolims=error_iso_d, fmt='.', color='r', markersize=8, marker='o', linestyle='none')
 
 
 	plt.savefig(f"plots/{var}_efficiency_{tau_type}.png")
