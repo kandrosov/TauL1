@@ -48,9 +48,7 @@ model = keras.models.load_model(f'models/model_v{args.model_version}')
 dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{args.dataset}', compression='GZIP')
 ds_pred = dataset.batch(300).map(to_pred)
 pred = model.predict(ds_pred)
-getInfo(dataset,pred,args.var,args.threshold,'e')
-'''
 for tau_type in ['e', 'tau', 'jet']:
 	print(f"tauType is {tau_type}")
 	getInfo(dataset,pred, args.var ,args.threshold,tau_type)
-'''
+
