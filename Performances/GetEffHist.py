@@ -68,10 +68,10 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 
 	import matplotlib.pyplot as plt
 
-	val_of_bins_num_iso, edges_of_bins_num_iso, patches_num_iso = plt.hist(var_num_iso, x_bins, range=(var_num.min(),x_bin.max()), histtype='step', label="num_iso")
-	val_of_bins_num, edges_of_bins_num, patches_num = plt.hist(var_num, x_bins, range=(var_num.min(),x_bin.max()), histtype='step', label="num")
+	val_of_bins_num_iso, edges_of_bins_num_iso, patches_num_iso = plt.hist(var_num_iso, x_bins, range=(var_num.min(),var_num.max()), histtype='step', label="num_iso")
+	val_of_bins_num, edges_of_bins_num, patches_num = plt.hist(var_num, x_bins, range=(var_num.min(),var_num.max()), histtype='step', label="num")
 	#print("a")
-	val_of_bins_den, edges_of_bins_den, patches_den = plt.hist(var_den, x_bins, range=(var_num.min(),x_bin.max()), histtype='step', label="den")
+	val_of_bins_den, edges_of_bins_den, patches_den = plt.hist(var_den, x_bins, range=(var_num.min(),var_num.max()), histtype='step', label="den")
 
 	print("bins:", edges_of_bins_num)
 	ratio = np.divide(val_of_bins_num,
@@ -99,7 +99,7 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 	plt.errorbar(bincenter_iso, ratio_iso, uplims=error_iso_u,lolims=error_iso_d, fmt='.', color='r', markersize=8, marker='o', linestyle='none')
 
 
-	plt.savefig(f"plots/{var}_efficiency_{tau_type}.png")
+	plt.savefig(f"plots/{var}_efficiency_{required_type}.png")
 
 
 
@@ -120,9 +120,9 @@ ds_pred = dataset.batch(300).map(to_pred)
 pred = model.predict(ds_pred)
 print(pred.shape)
 tau_type='tau'
-add_prediction(dataset,pred, args.var ,x_bins ,args.threshold,tau_type)
+#add_prediction(dataset,pred, args.var ,x_bins ,args.threshold,tau_type)
 #add_roc(dataset,pred,args.model_version)
-'''
+
 for tau_type in ['e', 'jet', 'tau']:
     add_prediction(dataset,pred, args.var ,x_bins ,args.threshold,tau_type)
-'''
+
