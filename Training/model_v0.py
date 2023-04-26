@@ -10,11 +10,11 @@ class TauL1Model(keras.Model):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.conv = [
-      Conv2D(16, (3, 3), activation='relu'),
-      Conv2D(16, (3, 3), activation='relu'),
-      Conv2D(8, (1, 1), activation='relu'),
-      Conv2D(8, (1, 1), activation='relu'),
-      Conv2D(8, (1, 1), activation='relu'),
+      Conv2D(16, (1, 1), activation='relu'),
+      Conv2D(16, (1, 1), activation='relu'),
+      Conv2D(8, (3, 3), activation='relu'),
+      Conv2D(8, (3, 3), activation='relu'),
+      Conv2D(8, (3, 3), activation='relu'),
     ]
     self.flatten = Flatten()
     self.dense = [
@@ -42,10 +42,8 @@ def to_train(x, y, w, meta):
 ds_train_val = dataset.batch(300).map(to_train)
 n_batches = ds_train_val.cardinality().numpy()
 n_batches_train = int(n_batches * 0.8)
-ds_train = ds_train_val.take(n_batches_train)
+ds_train = ds_train_val.take(n_batches_train).map(reweight)
 ds_val = ds_train_val.skip(n_batches_train)
-
-dataset.batch(300).map(reweight)
 
 for x, y, w in ds_train:
   model(x)

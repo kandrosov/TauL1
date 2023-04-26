@@ -2,6 +2,7 @@ import os
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
+import statsmodels.stats.proportion as ssp
 import argparse
 
 event_vars = [
@@ -87,6 +88,7 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 	print("ratio_iso:", ratio_iso)
 
 	fig = plt.figure(figsize=(10.,6.))
+ 	#ssp.proportion_confint(num, den, alpha=1-0.68, method='beta')
 	error = np.divide(val_of_bins_num * np.sqrt(val_of_bins_den) + val_of_bins_den * np.sqrt(val_of_bins_num),
 			          np.power(val_of_bins_den, 2),
 			          where=(val_of_bins_den != 0))
