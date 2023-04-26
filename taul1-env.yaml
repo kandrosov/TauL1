@@ -365,4 +365,5 @@ dependencies:
       - termcolor==2.2.0
       - werkzeug==2.2.3
       - wrapt==1.14.1
-prefix: /usr/local/miniconda3/envs/tau-l1
+prefix: /home/valeria/micromamba/envs/tau-l1
+

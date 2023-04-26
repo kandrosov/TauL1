@@ -3,3 +3,8 @@
 __pycache__
 /data
 /vhdl/*.cf
+*.png
+skim*/
+GluGlu*/
+*.txt
+models/
