@@ -1,0 +1,36 @@
+setup:
+  qbits: 16
+  l1reg: 0. #0.00001
+  init: lecun_uniform
+
+layers:
+  - type: conv
+    kernel_size: [ 3, 3 ]
+    strides: [ 1, 1 ]
+    filters: 8
+  - type: conv
+    kernel_size: [ 3, 3 ]
+    strides: [ 1, 1 ]
+    filters: 8
+  - type: conv
+    kernel_size: [ 2, 2 ]
+    strides: [ 1, 1 ]
+    filters: 8
+  - type: concat
+  - type: dense
+    units: 32
+    # prune: 0.5
+    # prune_begin: 1000
+    # prune_freq: 1000
+  - type: dense
+    units: 32
+    # prune: 0.5
+    # prune_begin: 1000
+    # prune_freq: 1000
+  - type: dense
+    units: 32
+    # prune: 0.5
+    # prune_begin: 1000
+    # prune_freq: 1000
+  - type: dense
+    units: 1

@@ -4,17 +4,31 @@ from tensorflow import keras
 import numpy as np
 import statsmodels.stats.proportion as ssp
 import argparse
-from CommonDef import *
+import sys
+import os
+
+if __name__ == "__main__":
+  file_dir = os.path.dirname(os.path.abspath(__file__))
+  sys.path.append(os.path.dirname(os.path.dirname(file_dir)))
+  __package__ = 'TauL1'
+
+from .CommonDef import *
+
+def to_hwIso(x,y,w,meta):
+    return meta[:, get_index('L1Tau_hwIso')]
+
+def get_y_info(x,y,w,meta):
+    return y
+
+def to_gen(x, y, w, meta):
+  return y
+
+def get_tauType_info(x,y,w,meta):
+    return meta[:, get_index('L1Tau_type')]
 
 
 def get_x_var(x, y, w, meta):
     return meta[:, get_index(args.var)]
-
-
-class TauType:
-  ele = 0
-  tau = 2
-  jet = 3
 
 
 def add_roc(dataset,pred,model_number):
@@ -22,7 +36,7 @@ def add_roc(dataset,pred,model_number):
 	tau_type = np.concatenate(list(dataset.batch(300).map(get_tauType_info).as_numpy_iterator()))
 	hwIso = np.concatenate(list(dataset.batch(300).map(to_hwIso).as_numpy_iterator()))
 	hwIso_noEle=hwIso[tau_type[:]!=TauType.e]
-	y_noEle=y[tau_type[:]!=TauType.e]	
+	y_noEle=y[tau_type[:]!=TauType.e]
 	fpr, tpr, threasholds = roc_curve(y_noEle, pred)
 	hw_fpr, hw_tpr, hw_threasholds = roc_curve(y, hwIso_noEle)
 	print(f'hw_fpr = {hw_fpr} \nhw_tpr={hw_tpr} \nhw_thresholds={hw_threasholds}')
@@ -33,7 +47,7 @@ def add_roc(dataset,pred,model_number):
 	#  if(tpr[tpr_idx]-hw_tpr[1]<0.00000001):
 	#    print(tpr[tpr_idx], hw_tpr[1], threasholds[tpr_idx])
 
-	with PdfPages(f'plots/roc_model_v{model_number}.pdf') as pdf:
+	with PdfPages(f'../Training/plots/roc_model_v{model_number}.pdf') as pdf:
   		fig, ax = plt.subplots(1, 1, figsize=(7, 7))
   		ax.plot(tpr, fpr, )
   		ax.errorbar(hw_tpr, hw_fpr, fmt='o', markersize=2, color='red')
@@ -42,10 +56,12 @@ def add_roc(dataset,pred,model_number):
   		plt.subplots_adjust(hspace=0)
   		pdf.savefig(fig, bbox_inches='tight')
 
-	
 
+def to_pred(x, y, w, meta):
+  return (x[:,:,:,2:4], x[:, 0, 0, :2]), meta[:, get_index(args.var)],
 
-def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
+def add_prediction(dataset, var, x_bins, thr, required_type='tau'):
+  pred = None
 	var_den_presel = np.concatenate(list(dataset.batch(300).map(get_x_var).as_numpy_iterator()))
 	gen_truth = np.concatenate(list(dataset.batch(300).map(get_y_info).as_numpy_iterator()))
 	tau_type = np.concatenate(list(dataset.batch(300).map(get_tauType_info).as_numpy_iterator()))
@@ -99,7 +115,7 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 	plt.errorbar(bincenter_iso, ratio_iso, uplims=error_iso_u,lolims=error_iso_d, fmt='.', color='r', markersize=8, marker='o', linestyle='none')
 
 
-	plt.savefig(f"plots/{var}_efficiency_{required_type}.png")
+	plt.savefig(f"plots/{var}_efficiency_{required_type}.pdf")
 
 
 
@@ -107,15 +123,15 @@ def add_prediction(dataset,pred, var ,x_bins ,thr,required_type='tau'):
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=False, type=int, default = 2)
 parser.add_argument('--threshold', required=False, type=float, default = 0.40430108)
-parser.add_argument('--model_version', required=False, type=int, default = 8)
+parser.add_argument('--model_version', required=False, type=int, default = 5)
 parser.add_argument('--var', required=False, type=str, default = 'L1Tau_gen_pt')
 args = parser.parse_args()
 
 #var = 'L1Tau_gen_pt'
 x_bins=[0,40,60,80,100,150,200,250]
 
-model = keras.models.load_model(f'models/model_v{args.model_version}')
-dataset = tf.data.Dataset.load(f'skim_v1_tf_v1/taus_{args.dataset}', compression='GZIP')
+model = keras.models.load_model(f'../Training/models/model_v{args.model_version}')
+dataset = tf.data.Dataset.load(f'../Training/skim_v1_tf_v1/taus_{args.dataset}', compression='GZIP')
 ds_pred = dataset.batch(300).map(to_pred)
 pred = model.predict(ds_pred)
 print(pred.shape)
