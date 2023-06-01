@@ -27,5 +27,14 @@ tower_vars = [
 all_vars = event_vars + gen_vars + reco_vars + hw_vars + tower_vars
 meta_vars = event_vars + gen_vars + reco_vars + hw_vars
 
+meta_vars_data = [
+  'run', 'luminosityBlock', 'event', 'nPFPrimaryVertex'
+]
+
+tau_vars_data = [
+  'L1Tau_pt', 'L1Tau_eta', 'L1Tau_phi', 'L1Tau_hwIso', 'L1Tau_isoEt', 'L1Tau_nTT', 'L1Tau_rawEt',
+  'L1Tau_hwPt', 'L1Tau_hwEta', 'L1Tau_hwPhi', 'L1Tau_towerIEta', 'L1Tau_towerIPhi', 'L1Tau_hwEtSum'
+]
+
 def get_index(name):
   return meta_vars.index(name)

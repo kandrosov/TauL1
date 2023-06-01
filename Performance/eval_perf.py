@@ -191,9 +191,13 @@ def eval_perf(dataset_path, output_path, vars, thr):
   for tau_type_name in [ 'tau', 'jet', 'e']:
     tau_type = getattr(TauType, tau_type_name)
     df_tau = df[df['L1Tau_type'] == tau_type]
-    df_thr = df[(df['nn_score'] > thr) & (df['L1Tau_type'] == tau_type)]
-    df_iso = df[(df['L1Tau_hwIso'] > 0) & (df['L1Tau_type'] == tau_type)]
     for var in vars:
+      cond = (df['L1Tau_type'] == tau_type)
+      if var != 'L1Tau_pt':
+        cond = cond & (df['L1Tau_pt'] > 35) & (np.abs(df['L1Tau_eta']) < 2.1)
+      df_thr = df[(df['nn_score'] > thr) & cond]
+      df_iso = df[(df['L1Tau_hwIso'] > 0) & cond]
+
       if var not in bin_settings:
         print(f'WARNING: no bin settings for {var}. Skipping.')
         continue
