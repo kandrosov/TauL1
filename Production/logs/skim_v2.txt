@@ -1,0 +1,43 @@
+Number of mix steps: 54
+Batch size: 500
+Total number of samples = 100677066.0: {'tau': 9367977.0, 'jet': 84201611.0, 'e': 7107478.0}
+Total number of used samples = 25894500.0: {'tau': 8286240.0, 'jet': 16572480.0, 'e': 1035780.0}
+Used fraction: {'tau': 0.8845282177785022, 'jet': 0.19681903710844678, 'e': 0.1457310173876022}
+Number of samples per batch: {'tau': 160, 'jet': 320, 'e': 20}
+Relative number of samples: {'tau': 1.0, 'jet': 2.0, 'e': 0.125}
+Step with minimum number of batches:
+n_batches: 51789.0
+taus/batch: 4
+inputs: ['Zprime', 'Higgs', 'DY', 'TT']
+eta bin: 1
+pt bin: 3
+bin idx: 1
+tau_type: tau
+selection: L1Tau_type == static_cast<int>(TauType::tau) && ( L1Tau_gen_pt >= 60.0 && L1Tau_gen_pt < 80.0 && L1Tau_gen_abs_eta >= 1.5 && L1Tau_gen_abs_eta < 2.1 )
+Step with maximum number of batches for tau:
+n_batches: 88820.0
+taus/batch: 1
+inputs: ['Zprime', 'Higgs', 'DY', 'TT']
+eta bin: 1
+pt bin: 4
+bin idx: 1
+tau_type: tau
+selection: L1Tau_type == static_cast<int>(TauType::tau) && ( L1Tau_gen_pt >= 80.0 && L1Tau_gen_pt < 100.0 && L1Tau_gen_abs_eta >= 1.5 && L1Tau_gen_abs_eta < 2.1 )
+Step with maximum number of batches for jet:
+n_batches: 2390860.0
+taus/batch: 2
+inputs: ['QCD']
+eta bin: 0
+pt bin: 7
+bin idx: 4
+tau_type: jet
+selection: L1Tau_type == static_cast<int>(TauType::jet) && ( L1Tau_gen_pt >= 250.0 && L1Tau_gen_pt < 1000.0 && L1Tau_gen_abs_eta >= 0.0 && L1Tau_gen_abs_eta < 1.5 )
+Step with maximum number of batches for e:
+n_batches: 676681.0
+taus/batch: 2
+inputs: ['Zprime', 'Higgs', 'DY', 'TT']
+eta bin: 0
+pt bin: 0
+bin idx: 6
+tau_type: e
+selection: L1Tau_type == static_cast<int>(TauType::e) && ( L1Tau_gen_pt >= 20.0 && L1Tau_gen_pt < 30.0 && L1Tau_gen_abs_eta >= 0.0 && L1Tau_gen_abs_eta < 1.5 )

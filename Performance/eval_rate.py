@@ -24,7 +24,7 @@ def eval_rate(dataset_path, output_path, thr):
     passed_cut = np.zeros(df.shape[0], dtype=int)
     passed_dnn = np.zeros(df.shape[0], dtype=int)
     for tau_idx in range(12):
-      sel = (df[f'L1Tau_pt_{tau_idx}'] > tau_pt) & (np.abs(df[f'L1Tau_eta_{tau_idx}']) < 2.1)
+      sel = (df[f'L1Tau_pt_{tau_idx}'] > tau_pt) & (np.abs(df[f'L1Tau_eta_{tau_idx}']) <= 2.131)
       passed_cut += sel & (df[f'L1Tau_hwIso_{tau_idx}'] > 0 )
       passed_dnn += sel & (df[f'nn_score_{tau_idx}'] > thr)
 
@@ -63,7 +63,7 @@ def eval_rate(dataset_path, output_path, thr):
 
       pdf.savefig(fig, bbox_inches='tight')
     for pt_idx, pt in enumerate(tau_pts):
-      print(f'{n} taus: pt > {pt}, iso_rate = {eff[pt_idx, 0, n, 0]}, nn_rate = {eff[pt_idx, 1, n, 0]}')
+      print(f'{n+1} taus: pt > {pt}, iso_rate = {eff[pt_idx, 0, n, 0]}, nn_rate = {eff[pt_idx, 1, n, 0]}')
 
 if __name__ == "__main__":
   import argparse

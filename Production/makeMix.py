@@ -100,6 +100,18 @@ def make_mix(cfg_file, output, n_jobs, job_id):
     df_in = df_in.Define(f'L1Tau_luminosityBlock', 'RVecI(L1Tau_pt.size(), static_cast<int>(luminosityBlock))')
     df_in = df_in.Define(f'L1Tau_run', 'RVecI(L1Tau_pt.size(), static_cast<int>(run))')
     other_columns = { 'nPV', 'event', 'luminosityBlock', 'run' }
+
+    tau_columns = [ 'Tau_pt', 'Tau_eta', 'Tau_phi', 'Tau_mass', 'Tau_deepTauVSjet' ]
+    for c in tau_columns:
+      df_in = df_in.Define(f'L1Tau_{c}', f'GetVar(L1Tau_tauIdx, {c}, -1.f)')
+      other_columns.add(c)
+
+    df_in = df_in.Define('Jet_PNet_probtauh', 'Jet_PNet_probtauhm + Jet_PNet_probtauhp')
+    jet_columns = [ 'Jet_pt', 'Jet_eta', 'Jet_phi', 'Jet_mass', 'Jet_PNet_probtauh', 'Jet_PNet_ptcorr' ]
+    for c in jet_columns:
+      df_in = df_in.Define(f'L1Tau_{c}', f'GetVar(L1Tau_jetIdx, {c}, -1.f)')
+      other_columns.add(c)
+
     l1tau_columns.extend(other_columns)
 
     columns_in = [ 'L1Tau_sel' ]

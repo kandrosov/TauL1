@@ -62,12 +62,16 @@ def MakeFileList(input):
       file_list.append(item)
   return sorted(file_list)
 
-def ApplyCommonDefinitions(df, deltaR=0.4, isData=False):
+def ApplyCommonDefinitions(df, deltaR=0.4, isData=False, isLL=False):
   df = df.Define("genLeptons", """reco_tau::gen_truth::GenLepton::fromNanoAOD(
                                     GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass,
                                     GenPart_genPartIdxMother, GenPart_pdgId, GenPart_statusFlags, event)""") \
          .Define('L1Tau_mass', 'RVecF(L1Tau_pt.size(), 0.)') \
-         .Define('L1Tau_p4', 'GetP4(L1Tau_pt, L1Tau_eta, L1Tau_phi, L1Tau_mass)')
+         .Define('L1Tau_p4', 'GetP4(L1Tau_pt, L1Tau_eta, L1Tau_phi, L1Tau_mass)') \
+         .Define('Jet_p4', 'GetP4(Jet_pt, Jet_eta, Jet_phi, Jet_mass)') \
+         .Define('Tau_p4', 'GetP4(Tau_pt, Tau_eta, Tau_phi, Tau_mass)') \
+         .Define('L1Tau_jetIdx', f'FindUniqueMatching(L1Tau_p4, Jet_p4, {deltaR})') \
+         .Define('L1Tau_tauIdx', f'FindUniqueMatching(L1Tau_p4, Tau_p4, {deltaR})')
   if isData:
     df = df.Define('L1Tau_type', 'RVecI(L1Tau_pt.size(), static_cast<int>(TauType::data))')
   else:
@@ -76,7 +80,7 @@ def ApplyCommonDefinitions(df, deltaR=0.4, isData=False):
            .Define('L1Tau_genLepIndices', f'FindMatchingSet(L1Tau_p4, GenLepton_p4, {deltaR})') \
            .Define('L1Tau_genLepUniqueIdx', f'FindUniqueMatching(L1Tau_p4, GenLepton_p4, {deltaR})') \
            .Define('L1Tau_genJetUniqueIdx', f'FindUniqueMatching(L1Tau_p4, GenJet_p4, {deltaR})') \
-           .Define('L1Tau_type', '''GetTauTypes(genLeptons, L1Tau_genLepUniqueIdx, L1Tau_genLepIndices,
+           .Define('L1Tau_type', f'''GetTauTypes(genLeptons, L1Tau_genLepUniqueIdx, L1Tau_genLepIndices,
                                                 L1Tau_genJetUniqueIdx, false)''') \
            .Define('L1Tau_gen_p4', '''GetGenP4(L1Tau_type, L1Tau_genLepUniqueIdx, L1Tau_genJetUniqueIdx, genLeptons,
                                                GenJet_p4)''') \

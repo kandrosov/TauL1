@@ -194,7 +194,7 @@ def eval_perf(dataset_path, output_path, vars, thr):
     for var in vars:
       cond = (df['L1Tau_type'] == tau_type)
       if var != 'L1Tau_pt':
-        cond = cond & (df['L1Tau_pt'] > 35) & (np.abs(df['L1Tau_eta']) < 2.1)
+        cond = cond & (df['L1Tau_pt'] > 34) & (np.abs(df['L1Tau_eta']) <= 2.131)
       df_thr = df[(df['nn_score'] > thr) & cond]
       df_iso = df[(df['L1Tau_hwIso'] > 0) & cond]
 

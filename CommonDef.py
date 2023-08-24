@@ -24,8 +24,18 @@ tower_vars = [
   'L1Tau_tower_relEta', 'L1Tau_tower_relPhi', 'L1Tau_tower_hwEtEm', 'L1Tau_tower_hwEtHad', 'L1Tau_tower_hwPt',
 ]
 
-all_vars = event_vars + gen_vars + reco_vars + hw_vars + tower_vars
-meta_vars = event_vars + gen_vars + reco_vars + hw_vars
+pftau_vars = [
+  'Tau_pt', 'Tau_eta', 'Tau_phi', 'Tau_mass', 'Tau_deepTauVSjet'
+]
+
+pfjet_vars = [
+  'Jet_pt', 'Jet_eta', 'Jet_phi', 'Jet_mass', 'Jet_PNet_probtauh', 'Jet_PNet_ptcorr'
+]
+
+ref_vars = [ 'phi_ref', 'eta_ref' ]
+
+meta_vars = event_vars + gen_vars + reco_vars + hw_vars + pftau_vars + pfjet_vars + ref_vars
+all_vars = meta_vars + tower_vars
 
 meta_vars_data = [
   'run', 'luminosityBlock', 'event', 'nPFPrimaryVertex'

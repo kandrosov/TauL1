@@ -76,6 +76,17 @@ RVecLV GetP4(const V1& pt, const V2& eta, const V3& phi, const V4& mass)
   return GetP4(pt, eta, phi, mass, CreateIndexes(pt.size()));
 }
 
+template<typename T>
+ROOT::VecOps::RVec<T> GetVar(const RVecI& idx, const ROOT::VecOps::RVec<T>& var, const T& default_value)
+{
+  ROOT::VecOps::RVec<T> result(idx.size(), default_value);
+  for(size_t i = 0; i < idx.size(); ++i) {
+    if(idx[i] >= 0)
+      result[i] = var[idx[i]];
+  }
+  return result;
+}
+
 inline RVecB RemoveOverlaps(const RVecLV& obj_p4, const RVecB& pre_sel, const std::vector<RVecLV>& other_objects,
                             size_t min_number_of_non_overlaps, double min_deltaR)
 {
