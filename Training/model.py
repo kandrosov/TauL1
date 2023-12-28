@@ -1,41 +1,16 @@
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.layers import Activation, Input, Dense, Conv2D, Flatten, Concatenate
+from tensorflow.keras.layers import Activation, Input, Dense, Conv2D, Flatten, Concatenate, Multiply
 from qkeras.qlayers import QDense, QActivation
 from qkeras.qconvolutional import QConv2D
-from qkeras.quantizers import quantized_bits, quantized_relu, quantized_tanh
+from qkeras.quantizers import quantized_bits, quantized_relu
 from tensorflow.keras.regularizers import l1
-import os
-import math
-import sys
-import yaml
 from tensorflow_model_optimization.sparsity.keras import prune_low_magnitude, ConstantSparsity, strip_pruning, UpdatePruningStep
 
-gpu_cfg = {
-  'gpu_index': 1,
-  'gpu_mem': 7 # GB
-}
+from ..CommonDef import *
 
-def setup_gpu(gpu_cfg):
-    gpus = tf.config.list_physical_devices('GPU')
-    if gpus:
-        try:
-            tf.config.set_visible_devices(gpus[gpu_cfg['gpu_index']], 'GPU')
-            # tf.config.experimental.set_virtual_device_configuration(gpus[gpu_cfg['gpu_index']],
-            #     [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=gpu_cfg['gpu_mem']*1024)])
-            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-        except RuntimeError as e:
-            print(e)
+pt_max = 255.
 
-setup_gpu(gpu_cfg)
-
-if __name__ == "__main__":
-  file_dir = os.path.dirname(os.path.abspath(__file__))
-  sys.path.append(os.path.dirname(os.path.dirname(file_dir)))
-  __package__ = 'TauL1'
-
-from .CommonDef import *
 
 def make_model(cfg):
   input_calo = Input(shape=(6, 9, 2), name='calo_grid')
@@ -43,105 +18,125 @@ def make_model(cfg):
 
   qbits = cfg['setup']['qbits']
   l1reg = cfg['setup']['l1reg']
+  l1reg = l1(l1reg) if l1reg > 0 else None
   init = cfg['setup']['init']
   conv_cnt = 0
+  center_cnt = 0
   dense_cnt = 0
-  relu_cnt = 0
-  x = input_calo
+  after_concat = False
+  x_calo = input_calo
+  x = None
+  has_pruning = False
   for layer_cfg in cfg['layers']:
     if layer_cfg['type'] == 'conv':
       conv_cnt += 1
-      relu_cnt += 1
-      x = QConv2D(layer_cfg['filters'], layer_cfg['kernel_size'], name=f'conv{conv_cnt}',
-                  strides=layer_cfg['strides'],
-                  kernel_quantizer=quantized_bits(qbits, 0, alpha=1),
-                  bias_quantizer=quantized_bits(qbits, 0, alpha=1),
-                  kernel_initializer=init,
-                  bias_initializer=init,
-                  kernel_regularizer=l1(l1reg),
-                  bias_regularizer=l1(l1reg)
-                  )(x)
-      x = QActivation(activation=quantized_relu(qbits), name=f'conv_relu{relu_cnt}')(x)
+      name_conv = f'conv{conv_cnt}'
+      x_calo = QConv2D(layer_cfg['filters'], layer_cfg['kernel_size'], name=name_conv,
+                       strides=layer_cfg['strides'],
+                       kernel_quantizer=quantized_bits(qbits, 0, alpha=1),
+                       bias_quantizer=quantized_bits(qbits, 0, alpha=1),
+                       kernel_initializer=init,
+                       bias_initializer=init,
+                       kernel_regularizer=l1reg,
+                       bias_regularizer=l1reg
+                      )(x_calo)
+      x_calo = QActivation(activation=quantized_relu(qbits), name=name_conv+'_relu')(x_calo)
     elif layer_cfg['type'] == 'concat':
-      x = Flatten(name='flatten')(x)
-      x = Concatenate(name='concat')([x, input_tau])
+      x_calo = Flatten(name='flatten')(x_calo)
+      if center_cnt > 0:
+        x = Concatenate(name='concat')([x, x_calo, input_tau])
+      else:
+        x = Concatenate(name='concat')([x_calo, input_tau])
+      after_concat = True
     elif layer_cfg['type'] == 'dense':
-      dense_cnt += 1
+      if after_concat:
+        dense_cnt += 1
+        name_dense = f'dense{dense_cnt}'
+      else:
+        if x is None:
+          x = Flatten(name='flatten_center')(input_calo[:, 2:4, 3:6, :])
+        center_cnt += 1
+        name_dense = f'center{center_cnt}'
 
-      layer = QDense(layer_cfg['units'], name=f'dense{dense_cnt}',
+      layer = QDense(layer_cfg['units'], name=name_dense,
                  kernel_quantizer=quantized_bits(qbits, 0, alpha=1),
                  bias_quantizer=quantized_bits(qbits, 0, alpha=1),
                  kernel_initializer=init,
                  bias_initializer=init,
-                 kernel_regularizer=l1(l1reg),
-                 bias_regularizer=l1(l1reg)
+                 kernel_regularizer=l1reg,
+                 bias_regularizer=l1reg
                  )
       prune = layer_cfg.get('prune', 0.)
       if prune > 0.:
+        has_pruning = True
         layer = prune_low_magnitude(layer, ConstantSparsity(prune, layer_cfg['prune_begin'], layer_cfg['prune_freq']))
       x = layer(x)
-      if layer_cfg['units'] > 1:
-        relu_cnt += 1
-        x = QActivation(activation=quantized_relu(qbits), name=f'dense_relu{relu_cnt}')(x)
+      if not layer_cfg.get('is_output', False):
+        x = QActivation(activation=quantized_relu(qbits), name=name_dense+'_relu')(x)
     else:
       raise Exception("Unknown layer type: {}".format(layer_cfg['type']))
   output = Activation('sigmoid', name='sigmoid')(x)
-  return keras.Model(inputs=[input_calo, input_tau], outputs=output, name='TauL1Model')
+  output_id = Activation('sigmoid', name='sigmoid_id')(x[:, 0:1])
+  output_pt = Activation('hard_sigmoid', name='sigmoid_pt')(x[:, 1:2])
+  pt_max_tf = tf.reshape(tf.constant(pt_max, dtype=tf.float32), (1, 1))
+  output_pt = Multiply(name='scale_pt')([output_pt, pt_max_tf])
+  output = Concatenate(name='concat_out')([output_id, output_pt])
 
-with open('Training/model.yaml') as f:
-  cfg = yaml.safe_load(f)
+  model = keras.Model(inputs=[input_calo, input_tau], outputs=output, name='TauL1Model')
+  return model, has_pruning
 
-model = make_model(cfg)
-model.summary()
-#raise Exception("Stop here")
+@tf.function
+def binary_entropy(target, output):
+  epsilon = tf.constant(1e-7, dtype=tf.float32)
+  x = tf.clip_by_value(output, epsilon, 1 - epsilon)
+  return - target * tf.math.log(x) - (1 - target) * tf.math.log(1 - x)
 
-#from tensorflow_model_optimization.python.core.sparsity.keras import prune, pruning_callbacks, pruning_schedule
-#from tensorflow_model_optimization.sparsity.keras import strip_pruning
+@tf.function
+def accuracy(target, output):
+  return tf.cast(tf.equal(target, tf.round(output)), tf.float32)
 
-#pruning_params = {"pruning_schedule": pruning_schedule.ConstantSparsity(0.75, begin_step=2000, frequency=100)}
-#model = prune.prune_low_magnitude(model, **pruning_params)
+def id_loss(y_true, y_pred):
+  return binary_entropy(y_true[:, 0], y_pred[:, 0]) * y_true[:, 2]
 
-model.compile(optimizer='adam', loss='binary_crossentropy', weighted_metrics=['accuracy'])
+def pt_loss(y_true, y_pred):
+  def _logcosh(x):
+    return x + tf.math.softplus(-2.0 * x) - tf.cast(tf.math.log(2.0), x.dtype)
+  rel_delta = (y_true[:, 1] - y_pred[:, 1]) / y_true[:, 1]
+  loss = tf.where(y_true[:, 0] == 1, _logcosh(rel_delta), tf.zeros_like(rel_delta))
+  return loss * y_true[:, 2]
 
+def id_acc(y_true, y_pred):
+  return accuracy(y_true[:, 0], y_pred[:, 0]) * y_true[:, 3]
 
+def l1tau_loss(y_true, y_pred):
+  k = 20.
+  return id_loss(y_true, y_pred) + k * pt_loss(y_true, y_pred)
 
-input_idx = 0
-dataset = tf.data.Dataset.load(f'output/skim_v1_tf_v1/taus_{input_idx}', compression='GZIP')
+def compile_model(model, cfg):
+  opt = keras.optimizers.AdamW(learning_rate=cfg['setup']['learning_rate'], weight_decay=cfg['setup']['weight_decay'])
+  model.compile(optimizer=opt, loss=l1tau_loss, metrics=[id_loss, pt_loss, id_acc, l1tau_loss])
 
-def to_train(x, y, w, meta):
-  a = 0.5
-  b = 1
-  #k = 100
-  gen_pt0 = 100
-  gen_pt = meta[:, get_index('L1Tau_gen_pt')]
+def make_save_model(has_pruning, cfg):
+  def _save_model(model, path):
+    if has_pruning:
+      model = strip_pruning(model)
+      compile_model(model, cfg)
+    model.save(path)
+  return _save_model
+
+def to_train(x, y, w_orig, meta):
   is_tau = meta[:, get_index('L1Tau_type')] == TauType.tau
-  #is_jet = meta[:, get_index('L1Tau_type')] == TauType.jet
-  #k = tf.math.log(meta[:, get_index("L1Tau_gen_pt")]/20.)
-  #w = w *( a * (meta[:,get_index('L1Tau_gen_pt')] - gen_pt0 ) + b)
-  w = tf.where(is_tau & (gen_pt > gen_pt0), w[:,0]*( a * (gen_pt - gen_pt0) + b), w[:, 0])
-  #w = tf.where(is_jet & (gen_pt > gen_pt0), w/( a * (gen_pt - gen_pt0) + b), w)
-  #w = tf.where(is_tau & (gen_pt > gen_pt0), w[:, 0] * tf.exp((gen_pt - gen_pt0)/k), w[:, 0])
-  return (x[:,:,:,2:4], x[:, 0, 0, :2]), y, w
+  tau_input = tf.stack([
+    meta[:, get_index('L1Tau_hwPt')],
+    meta[:, get_index('L1Tau_towerIEta')]
+  ], axis=1)
+  pnet_score = meta[:, get_index('Jet_PNet_probtauh')]
+  pnet_score = tf.where(pnet_score > 0, pnet_score, tf.zeros_like(pnet_score))
+  w = w_orig
+  w = tf.where(is_tau, w[:,0] * pnet_score, w[:, 0] * (1-pnet_score))
 
-ds_train_val = dataset.batch(300).map(to_train)
-n_batches = ds_train_val.cardinality().numpy()
-n_batches_train = int(n_batches * 0.8)
-ds_train = ds_train_val.take(n_batches_train)
-ds_val = ds_train_val.skip(n_batches_train)
+  gen_pt = meta[:, get_index('L1Tau_gen_pt')]
+  gen_pt_norm = tf.where(gen_pt < pt_max, gen_pt, tf.ones_like(gen_pt) * pt_max)
+  y = tf.stack([y[:, 0], gen_pt_norm, w, w_orig[:, 0]], axis=1)
+  return (x, tau_input), y
 
-k = 0
-dirFile = f'Training/models/model_v{k}'
-while(os.path.isdir(dirFile)):
-  k+=1
-  dirFile = f'Training/models/model_v{k}'
-print(dirFile)
-
-#callbacks = [ UpdatePruningStep() ]
-callbacks = [
-  tf.keras.callbacks.ModelCheckpoint(filepath=dirFile, save_weights_only=False, verbose=1, save_best_only=True),
-  tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
-]
-model.fit(ds_train, validation_data=ds_val, callbacks=callbacks, epochs=1000, verbose=1)
-#model = strip_pruning(model)
-#model.compile(optimizer='adam', loss='binary_crossentropy', weighted_metrics=['accuracy'])
-#model.save(dirFile)

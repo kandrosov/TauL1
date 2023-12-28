@@ -63,10 +63,7 @@ def MakeFileList(input):
   return sorted(file_list)
 
 def ApplyCommonDefinitions(df, deltaR=0.4, isData=False, isLL=False):
-  df = df.Define("genLeptons", """reco_tau::gen_truth::GenLepton::fromNanoAOD(
-                                    GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass,
-                                    GenPart_genPartIdxMother, GenPart_pdgId, GenPart_statusFlags, event)""") \
-         .Define('L1Tau_mass', 'RVecF(L1Tau_pt.size(), 0.)') \
+  df = df.Define('L1Tau_mass', 'RVecF(L1Tau_pt.size(), 0.)') \
          .Define('L1Tau_p4', 'GetP4(L1Tau_pt, L1Tau_eta, L1Tau_phi, L1Tau_mass)') \
          .Define('Jet_p4', 'GetP4(Jet_pt, Jet_eta, Jet_phi, Jet_mass)') \
          .Define('Tau_p4', 'GetP4(Tau_pt, Tau_eta, Tau_phi, Tau_mass)') \
@@ -75,7 +72,11 @@ def ApplyCommonDefinitions(df, deltaR=0.4, isData=False, isLL=False):
   if isData:
     df = df.Define('L1Tau_type', 'RVecI(L1Tau_pt.size(), static_cast<int>(TauType::data))')
   else:
-    df = df.Define('GenJet_p4', 'GetP4(GenJet_pt, GenJet_eta, GenJet_phi, GenJet_mass)') \
+    df = df.Define("genLeptons", """reco_tau::gen_truth::GenLepton::fromNanoAOD(
+                                    GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass,
+                                    GenPart_genPartIdxMother, GenPart_pdgId, GenPart_statusFlags, event)""") \
+           .Define('GenPart_p4', 'GetP4(GenPart_pt, GenPart_eta, GenPart_phi, GenPart_mass)') \
+           .Define('GenJet_p4', 'GetP4(GenJet_pt, GenJet_eta, GenJet_phi, GenJet_mass)') \
            .Define('GenLepton_p4', 'v_ops::visibleP4(genLeptons)') \
            .Define('L1Tau_genLepIndices', f'FindMatchingSet(L1Tau_p4, GenLepton_p4, {deltaR})') \
            .Define('L1Tau_genLepUniqueIdx', f'FindUniqueMatching(L1Tau_p4, GenLepton_p4, {deltaR})') \

@@ -104,3 +104,53 @@ inline RVecVecI GetL1TauTowerVar(size_t n_l1Taus, const RVecI& l1TauTowerVar, co
   }
   return converted;
 }
+
+inline int GetFirstCopy(int idx, const RVecI& GenPart_pdgId, const RVecI& GenPart_genPartIdxMother)
+{
+  while(GenPart_genPartIdxMother[idx] >= 0 && static_cast<size_t>(GenPart_genPartIdxMother[idx]) < GenPart_pdgId.size()
+      && GenPart_pdgId[idx] == GenPart_pdgId[GenPart_genPartIdxMother[idx]])
+    idx = GenPart_genPartIdxMother[idx];
+  if(idx < 0 || static_cast<size_t>(idx) >= GenPart_genPartIdxMother.size())
+    idx = -1;
+  return idx;
+}
+
+inline std::set<int> FindDaughters(int idx, const RVecI& GenPart_pdgId, const RVecI& GenPart_genPartIdxMother)
+{
+  std::set<int> daughters;
+  for(size_t p_idx = static_cast<size_t>(idx) + 1; p_idx < GenPart_pdgId.size(); ++p_idx) {
+    if(GenPart_genPartIdxMother[p_idx] == idx)
+      daughters.insert(p_idx);
+  }
+  return daughters;
+
+}
+
+inline std::set<int> FindParticles(int pdgId, const std::vector<int>& expected_daughters, const RVecI& GenPart_pdgId,
+                                   const RVecI& GenPart_genPartIdxMother)
+{
+  std::set<int> selected_particles;
+  for(size_t p_idx = 0; p_idx < GenPart_pdgId.size(); ++p_idx) {
+    if(GenPart_pdgId[p_idx] != pdgId) continue;
+    const auto daughter_idx = FindDaughters(p_idx, GenPart_pdgId, GenPart_genPartIdxMother);
+    std::set<int> selected_daughters;
+    bool all_matched = true;
+    for(auto expected_daughter_pdg : expected_daughters) {
+      bool matched = false;
+      for(auto daughter_idx : daughter_idx) {
+        if(!selected_daughters.count(daughter_idx) && GenPart_pdgId[daughter_idx] == expected_daughter_pdg) {
+          selected_daughters.insert(daughter_idx);
+          matched = true;
+          break;
+        }
+      }
+      if(!matched) {
+        all_matched = false;
+        break;
+      }
+    }
+    if(all_matched)
+      selected_particles.insert(p_idx);
+  }
+  return selected_particles;
+}

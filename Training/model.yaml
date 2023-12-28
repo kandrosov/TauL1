@@ -2,35 +2,59 @@ setup:
   qbits: 16
   l1reg: 0. #0.00001
   init: lecun_uniform
+  learning_rate: 0.0001
+  weight_decay: 0.01
 
 layers:
   - type: conv
-    kernel_size: [ 3, 3 ]
+    kernel_size: [ 2, 3 ]
+    strides: [ 1, 1 ]
+    filters: 6
+  - type: conv
+    kernel_size: [ 2, 3 ]
     strides: [ 1, 1 ]
     filters: 8
   - type: conv
-    kernel_size: [ 3, 3 ]
+    kernel_size: [ 2, 3 ]
     strides: [ 1, 1 ]
-    filters: 8
+    filters: 16
   - type: conv
     kernel_size: [ 2, 2 ]
     strides: [ 1, 1 ]
-    filters: 8
+    filters: 29
+  - type: conv
+    kernel_size: [ 2, 2 ]
+    strides: [ 1, 1 ]
+    filters: 92
+  - type: dense
+    units: 24
+  - type: dense
+    units: 20
+  - type: dense
+    units: 16
+  - type: dense
+    units: 12
   - type: concat
   - type: dense
-    units: 32
+    units: 84
     # prune: 0.5
     # prune_begin: 1000
     # prune_freq: 1000
   - type: dense
-    units: 32
+    units: 67
     # prune: 0.5
     # prune_begin: 1000
     # prune_freq: 1000
   - type: dense
-    units: 32
+    units: 53
     # prune: 0.5
     # prune_begin: 1000
     # prune_freq: 1000
   - type: dense
-    units: 1
+    units: 42
+    # prune: 0.5
+    # prune_begin: 1000
+    # prune_freq: 1000
+  - type: dense
+    units: 2
+    is_output: true

@@ -1,8 +1,8 @@
-
 class TauType:
   e = 0
   tau = 2
   jet = 3
+
 event_vars = [
   'run', 'luminosityBlock', 'event', 'nPV', 'step_idx'
 ]

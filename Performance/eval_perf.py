@@ -38,16 +38,35 @@ bin_settings = {
     'xlabel': r'gen visible $\tau_h$ $\eta$ (GeV)',
   },
   'L1Tau_pt': {
-    'bins': [ 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 255, 300 ],
-    'major_ticks': [ 20, 30, 40, 50, 70, 100, 140, 200, 255 ],
-    'minor_ticks': [ 60, 80, 90 ],
+    #'bins': [ 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 255, 300 ],
+    'bins': [ 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 255, 300 ],
+    #'major_ticks': [ 20, 30, 40, 50, 70, 100, 140, 200, 255 ],
+    'major_ticks': [ 80, 100, 150, 200, 255 ],
+    #'minor_ticks': [ 60, 80, 90 ],
+    #'minor_ticks': [ 90, 110, 120, 130, 140, 160, 170, 180, 190 ],
     'xlabel': r'L1Tau $p_{T}$ (GeV)',
     'xscale': 'log',
+    'ylim': [0.0, 1.005],
   },
   'L1Tau_eta': {
     'bins': np.arange(-2.5, 2.6, 0.5),
     'xlabel': r'L1Tau $\eta$ (GeV)',
   },
+  'Jet_pt': {
+    'bins': [ 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 300, 500, 1000 ],
+    'major_ticks': [ 20, 30, 40, 50, 70, 100, 140, 200, 300, 500, 1000 ],
+    'minor_ticks': [ 60, 80, 90 ],
+    'xlabel': r'PF Jet $p_{T}$ (GeV)',
+    'xscale': 'log',
+  },
+  'Jet_pt_corr': {
+    'bins': [ 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 300, 500, 1000 ],
+    'major_ticks': [ 20, 30, 40, 50, 70, 100, 140, 200, 300, 500, 1000 ],
+    'minor_ticks': [ 60, 80, 90 ],
+    'xlabel': r'PF Jet PNet-corrected $p_{T}$ (GeV)',
+    'xscale': 'log',
+  },
+
 }
 
 eff_y_label = {
@@ -91,9 +110,9 @@ def write_rate_list(rate_list, output_file):
     for item in rate_list:
       f.write(f'{item["thr"]:.3f},{item["tpr"]:.3f},{item["fpr"]:.4f}\n')
 
-def plot_eff(var, df, df_thr, df_iso, y_title, output_file):
+def plot_eff(var, df_all, df_thr, df_iso, y_title, output_file):
   hists = {}
-  for df_name, df in [('all', df), ('thr', df_thr), ('iso', df_iso)]:
+  for df_name, df in [('all', df_all), ('thr', df_thr), ('iso', df_iso)]:
     hists[df_name] = np.histogram(df[var], bins=bin_settings[var]['bins'])[0]
 
   eff = {}
@@ -124,7 +143,7 @@ def plot_eff(var, df, df_thr, df_iso, y_title, output_file):
     fig, ax = plt.subplots(1, 1, figsize=(7, 7))
     legend_entries = []
     legend_names = []
-    for ds_name, entry_name, color in [('thr', 'ShallowTau', 'b'), ('iso', 'L1 tau iso', 'r')]:
+    for ds_name, entry_name, color in [('iso', 'L1 tau iso', 'r'), ('thr', 'ShallowTau', 'b')]:
       entry = ax.errorbar(eff[ds_name]['x'], eff[ds_name]['y'],
                           xerr=(eff[ds_name]['x_down'], eff[ds_name]['x_up']),
                           yerr=(eff[ds_name]['y_down'], eff[ds_name]['y_up']),
@@ -137,6 +156,8 @@ def plot_eff(var, df, df_thr, df_iso, y_title, output_file):
     ax.set_ylabel(y_title)
     ax.set_xscale(bin_settings[var].get('xscale', 'linear'))
     ax.set_xlim(bin_settings[var]['bins'][0], bin_settings[var]['bins'][-1])
+    if 'ylim' in bin_settings[var]:
+      ax.set_ylim(*bin_settings[var]['ylim'])
 
     if 'major_ticks' in bin_settings[var]:
       ax.set_xticks(bin_settings[var]['major_ticks'], minor=False)
@@ -152,6 +173,7 @@ def eval_perf(dataset_path, output_path, vars, thr):
   os.makedirs(output_path)
 
   df = pd.read_hdf(dataset_path, key='taus')
+  df['Jet_pt_corr'] = df['Jet_pt'] * df['Jet_PNet_ptcorr']
 
   df_te = df[(df['L1Tau_type'] == TauType.e) | (df['L1Tau_type'] == TauType.tau)]
   fpr, tpr, threasholds = roc_curve(df_te['L1Tau_type'] == TauType.tau, df_te['nn_score'])
@@ -190,13 +212,35 @@ def eval_perf(dataset_path, output_path, vars, thr):
 
   for tau_type_name in [ 'tau', 'jet', 'e']:
     tau_type = getattr(TauType, tau_type_name)
-    df_tau = df[df['L1Tau_type'] == tau_type]
+    pnet_thr = 0.001
+    cond_ref = (df['L1Tau_type'] == tau_type) & (df['Jet_PNet_ptcorr'] > pnet_thr) & (df['Jet_pt_corr'] > 20) & (np.abs(df['Jet_eta']) <= 2.1)
+    df_tau = df[cond_ref]
     for var in vars:
-      cond = (df['L1Tau_type'] == tau_type)
+      cond = cond_ref
       if var != 'L1Tau_pt':
-        cond = cond & (df['L1Tau_pt'] > 34) & (np.abs(df['L1Tau_eta']) <= 2.131)
-      df_thr = df[(df['nn_score'] > thr) & cond]
-      df_iso = df[(df['L1Tau_hwIso'] > 0) & cond]
+        cond = cond & (df['L1Tau_pt'] >= 20) & (np.abs(df['L1Tau_eta']) <= 2.131)
+      # nn_score_formula = ((df['nn_score'] > 0.99) & (df['L1Tau_pt'] >= 20)) | \
+      #                    ((df['nn_score'] > 0.9) & (df['L1Tau_pt'] >= 25)) | \
+      #                    ((df['nn_score'] > 0.8) & (df['L1Tau_pt'] >= 30)) | \
+      #                    ((df['nn_score'] > 0.7) & (df['L1Tau_pt'] >= 35)) | \
+      #                    ((df['nn_score'] > 0.6) & (df['L1Tau_pt'] >= 40)) | \
+      #                    ((df['nn_score'] > 0.5) & (df['L1Tau_pt'] >= 45)) | \
+      #                    ((df['nn_score'] > 0.4) & (df['L1Tau_pt'] >= 50)) | \
+      #                    ((df['nn_score'] > 0.2) & (df['L1Tau_pt'] >= 55)) | \
+      #                    ((df['nn_score'] > 0.05) & (df['L1Tau_pt'] >= 60)) | \
+      #                    ((df['nn_score'] > 0.01) & (df['L1Tau_pt'] >= 70))
+      nn_score_formula = ((df['nn_score'] > 1.99) & (df['L1Tau_pt'] >= 60)) | \
+                         ((df['nn_score'] > 1.9) & (df['L1Tau_pt'] >= 70)) | \
+                         ((df['nn_score'] > 1.8) & (df['L1Tau_pt'] >= 80)) | \
+                         ((df['nn_score'] > 1.7) & (df['L1Tau_pt'] >= 90)) | \
+                         ((df['nn_score'] > 0.98) & (df['L1Tau_pt'] >= 100)) | \
+                         ((df['nn_score'] > 0.8) & (df['L1Tau_pt'] >= 110)) | \
+                         ((df['nn_score'] > 0.035) & (df['L1Tau_pt'] >= 120)) | \
+                         ((df['nn_score'] > 0.030) & (df['L1Tau_pt'] >= 140)) | \
+                         ((df['nn_score'] > 0.02) & (df['L1Tau_pt'] >= 150)) | \
+                         ((df['nn_score'] > 0.02) & (df['L1Tau_pt'] >= 200))
+      df_thr = df[nn_score_formula & cond]
+      df_iso = df[(df['L1Tau_hwIso'] > 0) & (df['L1Tau_pt'] >= 120) & cond ]
 
       if var not in bin_settings:
         print(f'WARNING: no bin settings for {var}. Skipping.')
@@ -212,7 +256,7 @@ if __name__ == "__main__":
   parser.add_argument('--output', required=True, type=str)
   parser.add_argument('--thr', required=True, type=float)
   parser.add_argument('--vars', required=False, type=str, default=','.join([
-    'nPV', 'L1Tau_gen_pt', 'L1Tau_gen_eta', 'L1Tau_pt', 'L1Tau_eta'
+    'nPV', 'L1Tau_gen_pt', 'L1Tau_gen_eta', 'L1Tau_pt', 'L1Tau_eta', 'Jet_pt_corr'
   ]))
   args = parser.parse_args()
 
