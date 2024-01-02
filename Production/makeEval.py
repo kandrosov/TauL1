@@ -14,12 +14,14 @@ import ROOT
 ROOT.gROOT.SetBatch(True)
 ROOT.EnableThreadSafety()
 
-def make_eval(dataset_path, output_file, is_data, event_range=None):
+def make_eval(dataset_path, output_file, mode, event_range=None):
   output_dir = os.path.dirname(output_file)
   if len(output_dir) > 0 and not os.path.exists(output_dir):
     os.makedirs(output_dir)
   if os.path.exists(output_file):
     os.remove(output_file)
+
+  is_data = mode == 'data'
 
   print('Loading inputs')
   dataset_path = dataset_path if dataset_path.endswith('.root') else os.path.join(dataset_path, '*.root')
@@ -33,11 +35,34 @@ def make_eval(dataset_path, output_file, is_data, event_range=None):
     n_tot = df_in.Count()
     df_in = df_in.Filter('nGenLep == 2')
     n_2 = df_in.Count()
-    for lep_idx in range(2):
-      df_in = df_in.Filter(f'''
-        genLeptons[{lep_idx}].visibleP4().pt() > 20 &&
-        abs(genLeptons[{lep_idx}].visibleP4().eta()) < 2.1 &&
-        genLeptons[{lep_idx}].kind() == reco_tau::gen_truth::GenLepton::Kind::TauDecayedToHadrons''')
+    df_in = df_in.Define('nGenHadTaus', '''
+      size_t n = 0;
+      for (const auto& genLepton : genLeptons) {
+        if (genLepton.kind() == reco_tau::gen_truth::GenLepton::Kind::TauDecayedToHadrons) {
+          ++n;
+        }
+      }
+      return n;
+    ''')
+    if mode == 'ditau':
+      for lep_idx in range(2):
+        df_in = df_in.Filter(f'''
+          genLeptons[{lep_idx}].visibleP4().pt() > 20 &&
+          abs(genLeptons[{lep_idx}].visibleP4().eta()) < 2.1 &&
+          genLeptons[{lep_idx}].kind() == reco_tau::gen_truth::GenLepton::Kind::TauDecayedToHadrons''')
+      selection = "2 gen tauh with visible pt > 20 && |eta| < 2.1"
+    elif mode == 'singletau':
+      df_in = df_in.Filter('nGenHadTaus == 1')
+      df_in = df_in.Define('genHadTauIdx', '''
+        if (genLeptons[0].kind() == reco_tau::gen_truth::GenLepton::Kind::TauDecayedToHadrons)
+          return 0;
+        return 1;
+      ''')
+      df_in = df_in.Filter('''
+        genLeptons[genHadTauIdx].visibleP4().pt() > 70 &&
+        abs(genLeptons[genHadTauIdx].visibleP4().eta()) < 2.1
+      ''')
+      selection = "1 gen tauh with visible pt > 70 && |eta| < 2.1"
     n_2_sel = df_in.Count()
     df_in = df_in.Define('htt_indices', 'FindParticles(25, {15, -15}, GenPart_pdgId, GenPart_genPartIdxMother)') \
                  .Define('htt_idx', 'htt_indices.size() == 1 ? *htt_indices.begin() : -1') \
@@ -111,7 +136,7 @@ def make_eval(dataset_path, output_file, is_data, event_range=None):
   df_in.Snapshot('Events', output_file, columns_in_v, opt)
   if not is_data:
     print(f'Total {n_tot.GetValue()} events, {n_2.GetValue()} with 2 gen leptons,'
-          f' {n_2_sel.GetValue()} with 2 gen tauh with visible pt > 20 && |eta| < 2.1,'
+          f' {n_2_sel.GetValue()} with {selection},'
           f' {n_with_htt.GetValue()} with H->tautau,'
           f' {n_with_hh.GetValue()} with H->tautau and H->bb')
 
@@ -121,9 +146,9 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Make evaluation dataset.')
   parser.add_argument('--dataset', required=True, type=str)
   parser.add_argument('--output', required=True, type=str)
-  parser.add_argument('--is-data', action='store_true')
+  parser.add_argument('--mode', required=True, type=str)
   parser.add_argument('--range', required=False, type=int, default=None)
   args = parser.parse_args()
 
   PrepareRootEnv()
-  make_eval(args.dataset, args.output, args.is_data, args.range)
+  make_eval(args.dataset, args.output, args.mode, args.range)

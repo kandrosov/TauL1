@@ -2,109 +2,172 @@ model_dir: model/best
 scores_dir: scores
 datasets_dir: /data2/Run3_HLT/prod_v3-eval
 algo_params_dir: algos
-event_metrics_dir: event_metrics
-differential_efficiency_dir: diff_eff
+variables_dir: vars
 performance_dir: perf
 apply_training:
   batch_size: 5000
 datasets:
   HTT:
     file: GluGluHToTauTau_M-125.root
-    title: "$H\to\tau\tau$"
+    title: "$H\\to\\tau\\tau$"
   HH:
     file: GluGlutoHHto2B2Tau_kl-1p00_kt-1p00_c2-0p00.root
-    title: "$HH\to bb\tau\tau$"
+    title: "$HH\\to bb\\tau\\tau$"
+  HTT_1tau:
+    file: GluGluHToTauTau_M-125_1tau.root
+    title: "$H\\to\\tau\\tau$ 1 $\\tau_h$"
+  HH_1tau:
+    file: GluGlutoHHto2B2Tau_kl-1p00_kt-1p00_c2-0p00_1tau.root
+    title: "$HH\\to bb\\tau\\tau$ 1 $\\tau_h$"
   ZeroBias_2022G:
     file: ZeroBias_Run2022G_362696.root
     title: "ZeroBias Run2022G run=362696"
-event_metrics:
-  rate:
-    dataset: ZeroBias_2022G
-    type: rate
-  eff_HH:
-    dataset: HH
-    type: efficiency
-  eff_HTT:
-    dataset: HTT
-    type: efficiency
 variables:
+  rate:
+    datasets: [ ZeroBias_2022G ]
+    scope: dataset
+    value_type: rate
+  efficiency:
+    datasets: [ HTT, HH, HH_1tau ]
+    scope: dataset
+    value_type: efficiency
   L1Tau_gen_pt:
-    tau_var: true
-    datasets: [ HTT, HH ]
+    scope: tau
+    datasets: [ HTT, HH, HH_1tau ]
     bins: [ 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450, 500, 600, 800, 1000 ]
     major_ticks: [ 20, 30, 40, 50, 70, 100, 200, 300, 500, 1000 ]
     minor_ticks: [ 60, 80, 90, 400, 600, 700, 800, 900 ]
     xlabel: "gen visible $p_{T}$ (GeV)"
     xscale: log
   L1Tau_gen_eta:
-    tau_var: true
-    datasets: [ HTT, HH ]
+    scope: tau
+    datasets: [ HTT, HH, HH_1tau ]
     bins: [ -2.5, -2.1, -1.7, -1, -0.5, 0, 0.5, 1, 1.7, 2.1, 2.5 ]
     xlabel: "gen visible $\\tau_h$ $\\eta$ (GeV)"
   L1Tau_pt:
-    tau_var: true
-    datasets: [ HTT, HH ]
+    scope: tau
+    datasets: [ HTT, HH, HH_1tau ]
     bins: [ 30, 32, 34, 36, 38, 40, 45, 50, 60, 70, 80, 90, 100, 120, 150, 200, 255, 300 ]
-    major_ticks: [ 20, 30, 40, 50, 70, 100, 150, 200, 255 ]
-    minor_ticks: [ 60, 80, 90, 110, 120, 130, 140, 160, 170, 180, 190 ]
+    major_ticks: [ 30, 40, 50, 70, 100, 150, 200, 255 ]
+    minor_ticks: [ 60, 80, 90, 110, 120, 130, 140, 160, 170, 180, 190, 210, 220, 230, 240, 250 ]
     xlabel: "L1Tau $p_{T}$ (GeV)"
     xscale: log
     ylim: [0.0, 1.005]
+  L1Tau_ptReg:
+    scope: tau
+    datasets: [ HTT, HH, HH_1tau ]
+    bins: [ 30, 32, 34, 36, 38, 40, 45, 50, 60, 70, 80, 90, 100, 120, 150, 200, 255, 300 ]
+    major_ticks: [ 30, 40, 50, 70, 100, 150, 200, 255 ]
+    minor_ticks: [ 60, 80, 90, 110, 120, 130, 140, 160, 170, 180, 190, 210, 220, 230, 240, 250 ]
+    xlabel: "L1Tau NN $p_{T}$ (GeV)"
+    xscale: log
+    ylim: [0.0, 1.005]
   L1Tau_eta:
-    tau_var: true
-    datasets: [ HTT, HH ]
+    scope: tau
+    datasets: [ HTT, HH, HH_1tau ]
     bins: [ -2.5, -2.1, -1.7, -1, -0.5, 0, 0.5, 1, 1.7, 2.1, 2.5 ]
     xlabel: "L1Tau $\\eta$ (GeV)"
   L1Tau_Jet_pt:
-    tau_var: true
-    datasets: [ HTT, HH ]
+    scope: tau
+    datasets: [ HTT, HH, HH_1tau ]
     bins: [ 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 300, 500, 1000 ]
     major_ticks: [ 20, 30, 40, 50, 70, 100, 140, 200, 300, 500, 1000 ]
     minor_ticks: [ 60, 80, 90 ]
     xlabel: "PF Jet $p_{T}$ (GeV)"
     xscale: log
+  L1Tau_Jet_pt_highPt:
+    column: L1Tau_Jet_pt
+    scope: tau
+    datasets: [ HH_1tau ]
+    bins: [ 70, 80, 90, 100, 120, 140, 160, 180, 200, 300, 500, 1000 ]
+    major_ticks: [ 70, 100, 140, 200, 300, 500, 1000 ]
+    minor_ticks: [ 80, 90 ]
+    xlabel: "PF Jet $p_{T}$ (GeV)"
+    xscale: log
   GenHH_mass:
-    tau_var: false
+    scope: event
     datasets: [ HH ]
     bins: [ 250, 300, 350, 400, 450, 500, 550, 600, 700, 800, 900, 1000 ]
     xlabel: "gen $m_{HH}$ (GeV)"
   GenHtt_pt:
-    tau_var: false
+    scope: event
     datasets: [ HTT, HH ]
     bins: [ 0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 700, 800, 900, 1000 ]
     xlabel: "gen $H\\to\\tau\\tau$ $p_T$ (GeV)"
 plots:
-  diff_eff:
+  efficiency:
+    datasets: [ HH, HTT ]
     variables: all
-    datasets: all
     variants:
       ditau_v1:
         - algo: default_2tau
+          title: "L1_DoubleIsoTau34er2p1"
           color: k
-        - algo: default_2tau_HT
+        - algo: nn_2tau_HTT_L1pt
+          title: "ShallowTau. HT & HTT WP tune. LUT $p_T^{L1}$"
           color: m
-        - algo: nn_2tau_HTT_L1pt
+        - algo: nn_2tau_HTT_ptReg
+          title: "ShallowTau. HT & HTT WP tune. LUT $p_T^{reg}$"
           color: g
-        - algo: nn_2tau_HTT_L1pt_HT
-          color: b
         - algo: nn_2tau_HH_L1pt
+          title: "ShallowTau. HT & HH WP tune. LUT $p_T^{L1}$"
+          color: b
+        - algo: nn_2tau_HH_ptReg
+          title: "ShallowTau. HT & HH WP tune. LUT $p_T^{reg}$"
           color: r
-        - algo: nn_2tau_HH_L1pt_HT
-          color: y
-      ditau_v2:
-        - algo: default_2tau
-          color: k
-        - algo: nn_2tau_HTT_L1pt
-          color: g
-        - algo: nn_2tau_HH_L1pt
-          color: y
         - algo: nn_2tau_L1pt_eff
+          title: "ShallowTau. $\\tau$ & HTT WP tune. LUT $p_T^{L1}$"
+          color: y
+        - algo: nn_2tau_ptReg_eff
+          title: "ShallowTau. $\\tau$ & HTT WP tune. LUT $p_T^{reg}$"
+          color: c
+      ditau_HT_v1:
+        - algo: default_2tau_HT
+          title: "L1_DoubleIsoTau34er2p1"
+          color: k
+        - algo: nn_2tau_HTT_L1pt_HT
+          title: "ShallowTau. HT & HTT WP tune. LUT $p_T^{L1}$"
+          color: m
+        - algo: nn_2tau_HTT_ptReg_HT
+          title: "ShallowTau. HT & HTT WP tune. LUT $p_T^{reg}$"
+          color: g
+        - algo: nn_2tau_HH_L1pt_HT
+          title: "ShallowTau. HT & HH WP tune. LUT $p_T^{L1}$"
           color: b
-
+        - algo: nn_2tau_HH_ptReg_HT
+          title: "ShallowTau. HT & HH WP tune. LUT $p_T^{reg}$"
+          color: r
+        - algo: nn_2tau_L1pt_eff_HT
+          title: "ShallowTau. $\\tau$ & HTT WP tune. LUT $p_T^{L1}$"
+          color: y
+        - algo: nn_2tau_ptReg_eff_HT
+          title: "ShallowTau. $\\tau$ & HTT WP tune. LUT $p_T^{reg}$"
+          color: c
+  efficiency_1tau:
+    datasets: [ HH_1tau ]
+    variables: all
+    variants:
+      tau_v1:
+        - algo: default_1tau
+          title: "L1_SingleTau120er2p1"
+          color: k
+        - algo: nn_1tau_HH_L1pt
+          title: "ShallowTau. 1 $\\tau$ WP tune. LUT $p_T^{L1}$"
+          color: m
+        - algo: nn_1tau_HH_ptReg
+          title: "ShallowTau. 1 $\\tau$ WP tune. LUT $p_T^{reg}$"
+          color: g
+        - algo: nn_1tau_L1pt_eff
+          title: "ShallowTau. $\\epsilon_\\tau^{1}$ WP tune. LUT $p_T^{L1}$"
+          color: b
+        - algo: nn_1tau_ptReg_eff
+          title: "ShallowTau. $\\epsilon_\\tau^{0.95}$ WP tune. LUT $p_T^{reg}$"
+          color: r
 lut_bins:
   nn_2tau_v2: [ 30, 32, 34, 36, 38, 40, 45, 50, 60, 70, 80, 90, 100, 120, 150, 200, 255 ]
   nn_2tau: [ 20, 23, 27, 30, 35, 40, 45, 50, 60, 70, 80, 100, 120 ]
-  nn_1tau: [ 70, 80, 90, 100, 110, 120, 130, 140, 150 ]
+  nn_1tau: [ 70, 80, 90, 100, 110, 120, 130, 140, 150, 170, 200, 250 ]
+  nn_1tau_v2: [ 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250 ]
 algorithms:
   default_2tau:
     algo: default
@@ -131,8 +194,56 @@ algorithms:
       tau_eff_dataset: HH
       tau_eff_var: L1Tau_pt
       tau_eff_algo: default_2tau
+      tau_eff_scale: 1
+      step: 0.01
+      extra_algos_eff: [ L1_HT ]
+  nn_2tau_ptReg_eff:
+    algo: nn
+    n_taus: 2
+    lut_var: L1Tau_ptReg
+    lut_bins: nn_2tau_v2
+    thresholds_opt:
+      dataset_eff: HTT
+      dataset_rate: ZeroBias_2022G
+      target_rate: default_2tau
+      tau_eff_dataset: HH
+      tau_eff_var: L1Tau_ptReg
+      tau_eff_algo: default_2tau
+      tau_eff_scale: 1
+      step: 0.01
+      #initial_thresholds: nn_2tau_L1pt_eff
+      extra_algos_eff: [ L1_HT ]
+  nn_2tau_L1pt_eff_99:
+    algo: nn
+    n_taus: 2
+    lut_var: L1Tau_pt
+    lut_bins: nn_2tau_v2
+    thresholds_opt:
+      dataset_eff: HTT
+      dataset_rate: ZeroBias_2022G
+      target_rate: default_2tau
+      tau_eff_dataset: HH
+      tau_eff_var: L1Tau_pt
+      tau_eff_algo: default_2tau
       tau_eff_scale: 0.99
       step: 0.01
+      extra_algos_eff: [ L1_HT ]
+  nn_2tau_ptReg_eff_99:
+    algo: nn
+    n_taus: 2
+    lut_var: L1Tau_ptReg
+    lut_bins: nn_2tau_v2
+    thresholds_opt:
+      dataset_eff: HTT
+      dataset_rate: ZeroBias_2022G
+      target_rate: default_2tau
+      tau_eff_dataset: HH
+      tau_eff_var: L1Tau_ptReg
+      tau_eff_algo: default_2tau
+      tau_eff_scale: 0.99
+      step: 0.01
+      #initial_thresholds: nn_2tau_L1pt_eff
+      extra_algos_eff: [ L1_HT ]
   nn_2tau_HTT_L1pt:
     algo: nn
     n_taus: 2
@@ -176,49 +287,53 @@ algorithms:
       extra_algos_eff: [ L1_HT ]
       target_rate: default_2tau
       initial_thresholds: nn_2tau_HTT_ptReg
-  nn_1tau_HTT_L1pt:
-    algo: nn
-    n_taus: 1
-    lut_var: L1Tau_pt
-    lut_bins: nn_1tau
-    thresholds_opt:
-      dataset_eff: HTT
-      dataset_rate: ZeroBias_2022G
-      extra_algos_eff: [ L1_HT, nn_2tau_HTT_L1pt ]
-      target_rate: default_1tau
   nn_1tau_HH_L1pt:
     algo: nn
     n_taus: 1
     lut_var: L1Tau_pt
     lut_bins: nn_1tau
     thresholds_opt:
-      dataset_eff: HH
+      dataset_eff: HH_1tau
       dataset_rate: ZeroBias_2022G
-      extra_algos_eff: [ L1_HT, nn_2tau_HH_L1pt ]
       target_rate: default_1tau
-      initial_thresholds: nn_1tau_HTT_L1pt
-  nn_1tau_HTT_ptReg:
-    algo: nn
-    n_taus: 1
-    lut_var: L1Tau_ptReg
-    lut_bins: nn_1tau
-    thresholds_opt:
-      dataset_eff: HTT
-      dataset_rate: ZeroBias_2022G
-      extra_algos_eff: [ L1_HT, nn_2tau_HTT_ptReg ]
-      target_rate: default_1tau
-      initial_thresholds: nn_1tau_HTT_L1pt
   nn_1tau_HH_ptReg:
     algo: nn
     n_taus: 1
     lut_var: L1Tau_ptReg
     lut_bins: nn_1tau
     thresholds_opt:
-      dataset_eff: HH
+      dataset_eff: HH_1tau
       dataset_rate: ZeroBias_2022G
-      extra_algos_eff: [ L1_HT, nn_2tau_HH_ptReg ]
       target_rate: default_1tau
-      initial_thresholds: nn_1tau_HTT_ptReg
+      initial_thresholds: nn_1tau_HH_L1pt
+  nn_1tau_L1pt_eff:
+    algo: nn
+    n_taus: 1
+    lut_var: L1Tau_pt
+    lut_bins: nn_1tau_v2
+    thresholds_opt:
+      dataset_eff: HH_1tau
+      dataset_rate: ZeroBias_2022G
+      target_rate: default_1tau
+      tau_eff_dataset: HH_1tau
+      tau_eff_var: L1Tau_Jet_pt_highPt
+      tau_eff_algo: default_1tau
+      tau_eff_scale: 1
+      step: 0.01
+  nn_1tau_ptReg_eff:
+    algo: nn
+    n_taus: 1
+    lut_var: L1Tau_ptReg
+    lut_bins: nn_1tau_v2
+    thresholds_opt:
+      dataset_eff: HH_1tau
+      dataset_rate: ZeroBias_2022G
+      target_rate: default_1tau
+      tau_eff_dataset: HH_1tau
+      tau_eff_var: L1Tau_Jet_pt_highPt
+      tau_eff_algo: default_1tau
+      tau_eff_scale: 0.95
+      step: 0.01
   default_2tau_HT:
     algo: composite
     sub_algos:
@@ -229,6 +344,16 @@ algorithms:
     sub_algos:
       - default_1tau
       - default_2tau
+      - L1_HT
+  nn_2tau_L1pt_eff_HT:
+    algo: composite
+    sub_algos:
+      - nn_2tau_L1pt_eff
+      - L1_HT
+  nn_2tau_ptReg_eff_HT:
+    algo: composite
+    sub_algos:
+      - nn_2tau_ptReg_eff
       - L1_HT
   nn_2tau_HTT_L1pt_HT:
     algo: composite
@@ -248,30 +373,6 @@ algorithms:
   nn_2tau_HH_ptReg_HT:
     algo: composite
     sub_algos:
-      - nn_2tau_HH_ptReg
-      - L1_HT
-  nn_12tau_HTT_L1pt_HT:
-    algo: composite
-    sub_algos:
-      - nn_1tau_HTT_L1pt
-      - nn_2tau_HTT_L1pt
-      - L1_HT
-  nn_12tau_HH_L1pt_HT:
-    algo: composite
-    sub_algos:
-      - nn_1tau_HH_L1pt
-      - nn_2tau_HH_L1pt
-      - L1_HT
-  nn_12tau_HTT_ptReg_HT:
-    algo: composite
-    sub_algos:
-      - nn_1tau_HTT_ptReg
-      - nn_2tau_HTT_ptReg
-      - L1_HT
-  nn_12tau_HH_ptReg_HT:
-    algo: composite
-    sub_algos:
-      - nn_1tau_HH_ptReg
       - nn_2tau_HH_ptReg
       - L1_HT
 resolution:
