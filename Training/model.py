@@ -15,9 +15,10 @@ pt_max = 255.
 def make_model(cfg):
   input_calo = Input(shape=(6, 9, 2), name='calo_grid')
   input_tau = Input(shape=(2,), name='tau_pt_eta')
+  input_center = Input(shape=(2, 3, 2), name='center_grid')
 
   qbits = cfg['setup']['qbits']
-  l1reg = cfg['setup']['l1reg']
+  l1reg = cfg['setup'].get('l1reg', 0)
   l1reg = l1(l1reg) if l1reg > 0 else None
   init = cfg['setup']['init']
   conv_cnt = 0
@@ -44,7 +45,7 @@ def make_model(cfg):
     elif layer_cfg['type'] == 'concat':
       x_calo = Flatten(name='flatten')(x_calo)
       if center_cnt > 0:
-        x = Concatenate(name='concat')([x, x_calo, input_tau])
+        x = Concatenate(name='concat')([x_calo, x])
       else:
         x = Concatenate(name='concat')([x_calo, input_tau])
       after_concat = True
@@ -54,7 +55,8 @@ def make_model(cfg):
         name_dense = f'dense{dense_cnt}'
       else:
         if x is None:
-          x = Flatten(name='flatten_center')(input_calo[:, 2:4, 3:6, :])
+          x = Flatten(name='flatten_center')(input_center)
+          x = Concatenate(name='concat_center')([x, input_tau])
         center_cnt += 1
         name_dense = f'center{center_cnt}'
 
@@ -75,14 +77,15 @@ def make_model(cfg):
         x = QActivation(activation=quantized_relu(qbits), name=name_dense+'_relu')(x)
     else:
       raise Exception("Unknown layer type: {}".format(layer_cfg['type']))
-  output = Activation('sigmoid', name='sigmoid')(x)
-  output_id = Activation('sigmoid', name='sigmoid_id')(x[:, 0:1])
-  output_pt = Activation('hard_sigmoid', name='sigmoid_pt')(x[:, 1:2])
-  pt_max_tf = tf.reshape(tf.constant(pt_max, dtype=tf.float32), (1, 1))
-  output_pt = Multiply(name='scale_pt')([output_pt, pt_max_tf])
-  output = Concatenate(name='concat_out')([output_id, output_pt])
-
-  model = keras.Model(inputs=[input_calo, input_tau], outputs=output, name='TauL1Model')
+  if cfg['setup']['regress_pt']:
+    output_id = Activation('sigmoid', name='sigmoid_id')(x[:, 0:1])
+    output_pt = Activation('hard_sigmoid', name='sigmoid_pt')(x[:, 1:2])
+    pt_max_tf = tf.reshape(tf.constant(pt_max, dtype=tf.float32), (1, 1))
+    output_pt = Multiply(name='scale_pt')([output_pt, pt_max_tf])
+    output = Concatenate(name='concat_out')([output_id, output_pt])
+  else:
+    output = Activation('sigmoid', name='sigmoid')(x)
+  model = keras.Model(inputs=[input_calo, input_tau, input_center], outputs=output, name='TauL1Model')
   return model, has_pruning
 
 @tf.function
@@ -114,7 +117,13 @@ def l1tau_loss(y_true, y_pred):
 
 def compile_model(model, cfg):
   opt = keras.optimizers.AdamW(learning_rate=cfg['setup']['learning_rate'], weight_decay=cfg['setup']['weight_decay'])
-  model.compile(optimizer=opt, loss=l1tau_loss, metrics=[id_loss, pt_loss, id_acc, l1tau_loss])
+  metrics = [id_loss, id_acc]
+  if cfg['setup']['regress_pt']:
+    loss=l1tau_loss
+    metrics.extend([pt_loss, l1tau_loss])
+  else:
+    loss=id_loss
+  model.compile(optimizer=opt, loss=loss, metrics=metrics)
 
 def make_save_model(has_pruning, cfg):
   def _save_model(model, path):
@@ -126,7 +135,7 @@ def make_save_model(has_pruning, cfg):
 
 def to_train(x, y, w_orig, meta):
   is_tau = meta[:, get_index('L1Tau_type')] == TauType.tau
-  tau_input = tf.stack([
+  input_tau = tf.stack([
     meta[:, get_index('L1Tau_hwPt')],
     meta[:, get_index('L1Tau_towerIEta')]
   ], axis=1)
@@ -138,5 +147,7 @@ def to_train(x, y, w_orig, meta):
   gen_pt = meta[:, get_index('L1Tau_gen_pt')]
   gen_pt_norm = tf.where(gen_pt < pt_max, gen_pt, tf.ones_like(gen_pt) * pt_max)
   y = tf.stack([y[:, 0], gen_pt_norm, w, w_orig[:, 0]], axis=1)
-  return (x, tau_input), y
+  input_calo = x
+  input_center = input_calo[:, 2:4, 3:6, :]
+  return (input_calo, input_tau, input_center), y
 

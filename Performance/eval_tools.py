@@ -20,6 +20,7 @@ collision_rate = 40e6 # Hz
 def get_shortest_interval(x, alpha=0.68, step=0.01, rel_tolerance=0.01):
   assert(alpha > 0 and alpha < 1)
   q_values_left = np.arange(0, 1 - alpha + step, step).tolist()
+  q_values_left = [ x for x in q_values_left if x + alpha <= 1 ]
   n_tot = len(q_values_left)
   half_interval = (1 - alpha) / 2
   q_values_left = sorted(q_values_left, key=lambda x: abs(half_interval - x))

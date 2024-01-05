@@ -84,6 +84,19 @@ class PlotDatasetEfficiency(PlotBase):
     ax.set_xlabel('Efficiency')
     return fig
 
+class PlotScoresDiff(PlotBase):
+  def __init__(self, name, output):
+    super().__init__(name, output, [])
+
+  def plot(self):
+    fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+    ax.hist(self.delta_scores, bins=100, range=(-1, 1))
+    ax.set_xlabel('score - quantized_score')
+    ax.set_yscale('log')
+    text = f'{self.cl*100:.0f}% CL interval ({self.q_limits[0]:.3f}, {self.q_limits[1]:.3f})'
+    ax.text(0.55, 0.9, text, transform=ax.transAxes, fontsize=11, verticalalignment='top')
+    return fig
+
 class PlotCollection(CollectionBase):
   def __init__(self, base_dir, cfg, variables):
     self.plots = {}
@@ -117,3 +130,4 @@ class PlotCollection(CollectionBase):
         for variable_name, variable_entry in variant_entry.items():
           for ds_name, plot in variable_entry.items():
             yield f'{plot_name}/{variant_name}/{variable_name}/{ds_name}', plot
+

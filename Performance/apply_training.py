@@ -5,14 +5,17 @@ import uproot
 from numba import njit
 import awkward as ak
 import numpy as np
+import shutil
 
 os.environ["CUDA_VISIBLE_DEVICES"]="-1"
-import tensorflow as tf
 
 if __name__ == "__main__":
   file_dir = os.path.dirname(os.path.abspath(__file__))
   sys.path.append(os.path.dirname(os.path.dirname(file_dir)))
   __package__ = 'TauL1'
+
+from TauL1.Performance.model_tools import load_model
+from TauL1.hls4ml.load_model import load_hls4ml_model
 
 @njit
 def fill_taus(tau_data, index, var_values):
@@ -53,10 +56,6 @@ tau_vars = [ 'L1Tau_hwPt', 'L1Tau_towerIEta' ]
 
 all_vars = tau_vars + tower_vars
 
-def fn(y_true, y_pred):
-  pass
-
-
 def get_inputs(columns):
 
   ref_column = columns[tau_vars[0]]
@@ -73,32 +72,53 @@ def get_inputs(columns):
   fill_towers(tower_data, counts, columns['L1TauTowers_tauIdx'], columns['L1TauTowers_relEta'],
               columns['L1TauTowers_relPhi'], columns['L1TauTowers_hwEtEm'], columns['L1TauTowers_hwEtHad'])
 
-  return counts, tau_data, tower_data
+  center_data = np.ascontiguousarray(tower_data[:, 2:4, 3:6, :])
+  return counts, tau_data, tower_data, center_data
 
-def apply_training(dataset_path, model_path, output_file, batch_size):
-  custom_objects = [ 'l1tau_loss', 'id_loss', 'pt_loss', 'id_acc' ]
-  custom_objects = { name: fn for name in custom_objects }
-  model = tf.keras.models.load_model(model_path, custom_objects=custom_objects)
+def apply_training(dataset_path, model, output_file, batch_size, has_pt_node=False, is_hls4ml=False):
   output_dir = os.path.dirname(output_file)
   if len(output_dir) > 0 and not os.path.exists(output_dir):
     os.makedirs(output_dir)
+  output_file_tmp = output_file + '.tmp.root'
   if os.path.exists(output_file):
     os.remove(output_file)
+  if os.path.exists(output_file_tmp):
+    os.remove(output_file_tmp)
 
   print('Loading inputs')
 
   file = uproot.open(dataset_path)
   events = file['Events']
-  with uproot.recreate(output_file, compression=uproot.LZMA(9)) as out_file:
+  with uproot.recreate(output_file_tmp, compression=uproot.LZMA(9)) as out_file:
     with tqdm(total=events.num_entries) as pbar:
       for columns in events.iterate(all_vars, step_size=batch_size):
         n_evt = len(columns[tau_vars[0]])
-        counts, tau_data, tower_data = get_inputs(columns)
-        pred = model((tower_data, tau_data)).numpy()
+        counts, tau_data, tower_data, center_data = get_inputs(columns)
+        inputs = (tower_data, tau_data, center_data)
+        if is_hls4ml:
+          pred = model.predict(inputs)
+          suffix = '_q'
+        else:
+          pred = model(inputs).numpy()
+          suffix = ''
+
+        n_finite = np.sum(np.isfinite(pred), dtype=int)
+        n_tot = np.shape(pred)[0] * np.shape(pred)[1]
+        n_nonfinite = n_tot - n_finite
+        if n_nonfinite > 0:
+          raise RuntimeError(f'{n_nonfinite} nonfinite values found in predictions')
+
+        nn_tags = ak.unflatten(pred[:, 0], counts)
+        if has_pt_node:
+          pt_reg = ak.unflatten(pred[:, 1], counts)
+        else:
+          pt_reg = ak.zeros_like(nn_tags)
+
         data = {
-          'L1Tau_NNtag': ak.unflatten(pred[:, 0], counts),
-          'L1Tau_ptReg': ak.unflatten(pred[:, 1], counts),
+          'L1Tau_NNtag' + suffix: nn_tags,
+          'L1Tau_ptReg' + suffix: pt_reg,
         }
+
 
         if 'Events' in out_file:
           out_file['Events'].extend(data)
@@ -106,6 +126,7 @@ def apply_training(dataset_path, model_path, output_file, batch_size):
           out_file['Events'] = data
 
         pbar.update(n_evt)
+  shutil.move(output_file_tmp, output_file)
 
 if __name__ == "__main__":
   import argparse
@@ -115,6 +136,21 @@ if __name__ == "__main__":
   parser.add_argument('--model', required=True, type=str)
   parser.add_argument('--output', required=True, type=str)
   parser.add_argument('--batch-size', required=False, type=int, default=2500)
+  parser.add_argument('--use-hls4ml', action='store_true')
+  parser.add_argument('--has-pt-node', action='store_true')
+  parser.add_argument('--hls4ml-model', required=False, type=str, default=None)
+  parser.add_argument('--hls4ml-config', required=False, type=str, default=None)
+  parser.add_argument('--fpga-part', required=False, type=str, default=None)
+
   args = parser.parse_args()
 
-  apply_training(args.dataset, args.model, args.output, args.batch_size)
+  if args.use_hls4ml:
+    assert(args.hls4ml_model is not None)
+    assert(args.hls4ml_config is not None)
+    assert(args.fpga_part is not None)
+    model = load_hls4ml_model(args.model, args.hls4ml_config, fpga_part=args.fpga_part, output_path=args.hls4ml_model,
+                              compile=True)
+  else:
+    model = load_model(args.model)
+
+  apply_training(args.dataset, model, args.output, args.batch_size, args.has_pt_node, args.use_hls4ml)

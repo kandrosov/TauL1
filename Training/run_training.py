@@ -24,6 +24,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--cfg', required=False, default='Training/model.yaml', type=str)
   parser.add_argument('--output', required=False, default='data', type=str)
+  parser.add_argument('--output-name', required=False, default=None, type=str)
   parser.add_argument('--gpu', required=False, default='1', type=str)
   parser.add_argument('--batch-size', required=False, type=int, default=2000)
   parser.add_argument('--patience', required=False, type=int, default=4)
@@ -52,13 +53,17 @@ if __name__ == "__main__":
   ds_val = dataset_val.batch(args.batch_size).map(to_train).prefetch(tf.data.AUTOTUNE)
 
   output_root = 'data'
-  timestamp_str = datetime.datetime.now().strftime('%Y-%m-%dT%H%M%S')
-  dirFile = os.path.join(output_root, timestamp_str)
+  if args.output_name is None:
+    output_name = datetime.datetime.now().strftime('%Y-%m-%dT%H%M%S')
+  else:
+    output_name = args.output_name
+  dirFile = os.path.join(output_root, output_name)
   if os.path.exists(dirFile):
     raise RuntimeError(f'Output directory {dirFile} already exists')
   os.makedirs(dirFile)
 
-  shutil.copy('Training/model.yaml', dirFile)
+  cfg_out = os.path.join(dirFile, 'model.yaml')
+  shutil.copy(args.cfg, cfg_out)
   shutil.copy('Training/model.py', dirFile)
 
   dirFile = os.path.join(dirFile, 'model')

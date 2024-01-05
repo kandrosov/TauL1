@@ -278,7 +278,8 @@ class Algorithm:
           elif self.algo == 'nn':
             self.lut_var = cfg['lut_var']
             self.lut_bins = lut_bins[cfg['lut_bins']]
-            self.columns.update([ 'L1Tau_NNtag', 'L1Tau_ptReg', self.lut_var ])
+            self.nn_var = cfg['nn_var']
+            self.columns.update([ self.nn_var, 'L1Tau_ptReg', self.lut_var ])
             self.sel_fn = mk_sel_fn(self.lut_bins, self.lut_var)
             opt = cfg['thresholds_opt']
             self.thresholds_opt = {}
@@ -392,19 +393,17 @@ class Algorithm:
       return self._get_combined_mask(dataset, 'get_tau_pass_mask', require_gen_match)
     else:
       if self.algo == 'default':
-        df = dataset.get_input()
         if self.pt_iso_thr > 0:
           pt_thr = self.pt_iso_thr
           require_iso = True
         else:
           pt_thr = self.pt_noiso_thr
           require_iso = False
-        mask = get_tau_pass_mask_default(df['L1Tau_pt'], df['L1Tau_eta'], df['L1Tau_hwIso'], pt_thr, require_iso)
+        mask = get_tau_pass_mask_default(dataset['L1Tau_pt'], dataset['L1Tau_eta'], dataset['L1Tau_hwIso'], pt_thr,
+                                         require_iso)
       elif self.algo == 'nn':
-        df = dataset.get_input()
-        df_scores = dataset.get_scores()
-        mask = self.sel_fn(df['L1Tau_pt'], df['L1Tau_eta'], df_scores['L1Tau_NNtag'], df_scores['L1Tau_ptReg'],
-                                self.thresholds)
+        mask = self.sel_fn(dataset['L1Tau_pt'], dataset['L1Tau_eta'], dataset[self.nn_var], dataset['L1Tau_ptReg'],
+                           self.thresholds)
       else:
         raise RuntimeError(f'get_tau_pass_mask: algorithm {self.algo} not supported')
 
@@ -419,16 +418,14 @@ class Algorithm:
       return self._get_combined_mask(dataset, 'get_pass_mask', require_gen_match)
     else:
       if self.algo == 'l1_flag':
-        return dataset.get_input()[self.l1_flag]
+        return dataset[self.l1_flag]
       elif self.algo in 'default':
-        df = dataset.get_input()
-        return get_pass_mask_default_or(df['L1Tau_pt'], df['L1Tau_eta'], df['L1Tau_hwIso'], self.pt_iso_thr,
-                                        self.pt_noiso_thr, self.n_taus, df['L1Tau_type'], require_gen_match)
+        return get_pass_mask_default_or(dataset['L1Tau_pt'], dataset['L1Tau_eta'], dataset['L1Tau_hwIso'],
+                                        self.pt_iso_thr, self.pt_noiso_thr, self.n_taus, dataset['L1Tau_type'],
+                                        require_gen_match)
       elif self.algo == 'nn':
-        df = dataset.get_input()
-        df_scores = dataset.get_scores()
-        return get_pass_mask_nn(df['L1Tau_pt'], df['L1Tau_eta'], df_scores['L1Tau_NNtag'], df_scores['L1Tau_ptReg'],
-                                self.thresholds, self.sel_fn, self.n_taus, df['L1Tau_type'], require_gen_match)
+        return get_pass_mask_nn(dataset['L1Tau_pt'], dataset['L1Tau_eta'], dataset[self.nn_var], dataset['L1Tau_ptReg'],
+                                self.thresholds, self.sel_fn, self.n_taus, dataset['L1Tau_type'], require_gen_match)
       else:
         raise RuntimeError(f'get_pass_mask: algorithm {self.algo} not supported')
 
@@ -461,7 +458,7 @@ class Algorithm:
       _, tau_passed = tau_eff_var.get_total_and_passed()
       min_passed_args['min_passed_L1Tau_pt'] = tau_eff_var.dataset['L1Tau_pt']
       min_passed_args['min_passed_L1Tau_eta'] = tau_eff_var.dataset['L1Tau_eta']
-      min_passed_args['min_passed_L1Tau_NNtag'] = tau_eff_var.dataset['L1Tau_NNtag']
+      min_passed_args['min_passed_L1Tau_NNtag'] = tau_eff_var.dataset[self.nn_var]
       min_passed_args['min_passed_L1Tau_ptReg'] = tau_eff_var.dataset['L1Tau_ptReg']
       min_passed_args['min_passed_L1Tau_type'] = tau_eff_var.dataset['L1Tau_type']
       min_passed_args['min_passed_var'] = tau_eff_var.dataset[tau_eff_var.column]
@@ -473,9 +470,9 @@ class Algorithm:
         min_passed_counts = np.ceil(min_passed_counts * tau_eff_scale)
       min_passed_args['min_passed_counts'] = np.array(min_passed_counts, dtype=int)
 
-    eff, rate, nn_thrs = find_nn_thrs(ds_eff['L1Tau_pt'], ds_eff['L1Tau_eta'], ds_eff['L1Tau_NNtag'],
+    eff, rate, nn_thrs = find_nn_thrs(ds_eff['L1Tau_pt'], ds_eff['L1Tau_eta'], ds_eff[self.nn_var],
                                       ds_eff['L1Tau_ptReg'], ds_eff['L1Tau_type'],
-                                      ds_rate['L1Tau_pt'], ds_rate['L1Tau_eta'], ds_rate['L1Tau_NNtag'],
+                                      ds_rate['L1Tau_pt'], ds_rate['L1Tau_eta'], ds_rate[self.nn_var],
                                       ds_rate['L1Tau_ptReg'], self.sel_fn,
                                       n_nn_thrs, self.n_taus, self.thresholds_opt['target_rate'],
                                       initial_thrs=self.thresholds_opt['initial_thresholds'],
