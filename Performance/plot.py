@@ -38,7 +38,7 @@ class PlotBase:
 
 class PlotEfficiency(PlotBase):
   def plot(self):
-    fig, ax = plt.subplots(1, 1, figsize=(7, 7))
+    fig, ax = plt.subplots(1, 1, figsize=(7, 4))
     legend_entries = []
     legend_names = []
     for entry in self.entries:
@@ -51,9 +51,10 @@ class PlotEfficiency(PlotBase):
       legend_names.append(title)
     ax.legend(legend_entries, legend_names, loc='lower right')
 
-    ax.set_xlabel(var.xlabel)
-    ax.set_ylabel('Efficiency')
+    ax.set_xlabel(var.xlabel, fontsize=14)
+    ax.set_ylabel('Efficiency', fontsize=14)
     ax.set_xscale(var.xscale)
+    ax.set_yscale(var.yscale)
     ax.set_xlim(*var.xlim)
     if var.ylim is not None:
       ax.set_ylim(*var.ylim)

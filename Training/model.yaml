@@ -1,35 +1,26 @@
 setup:
   qbits: 8
-  l1reg: 0.00001
-  init: lecun_uniform
+  # l1reg: 0.000001
+  init: he_uniform
   learning_rate: 0.0001
-  weight_decay: 0.01
+  weight_decay: 0.1
   regress_pt: false
+  reduce_calo_precision: 0
+  reduce_center_precision: 0
+  apply_avg_pool: true
+  concat_input: true
 
 layers:
-  - type: conv
-    kernel_size: [ 2, 3 ]
-    strides: [ 2, 3 ]
-    filters: 6
-  - type: conv
-    kernel_size: [ 3, 3 ]
-    strides: [ 3, 3 ]
-    filters: 12
+  - type: dense
+    units: 42
+    prune: 0
+    prune_begin: 2000
+    prune_freq: 2000
   - type: dense
     units: 16
-  - type: dense
-    units: 8
-  - type: concat
-  - type: dense
-    units: 32
-    # prune: 0.5
-    # prune_begin: 1000
-    # prune_freq: 1000
-  - type: dense
-    units: 16
-    # prune: 0.5
-    # prune_begin: 1000
-    # prune_freq: 1000
+    prune: 0
+    prune_begin: 2000
+    prune_freq: 2000
   - type: dense
     units: 1
     is_output: true

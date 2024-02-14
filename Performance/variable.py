@@ -108,7 +108,10 @@ class Variable(BaseVariable):
     self.minor_ticks = cfg.get('minor_ticks', None)
     self.xlabel = cfg['xlabel']
     self.xscale = cfg.get('xscale', 'linear')
-    self.xlim = (self.bins[0], self.bins[-1])
+    self.yscale = cfg.get('yscale', 'linear')
+    self.xlim = cfg.get('xlim', None)
+    if self.xlim is None:
+      self.xlim = (self.bins[0], self.bins[-1])
     self.ylim = cfg.get('ylim', None)
 
   def from_json(self, data):

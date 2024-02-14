@@ -15,7 +15,7 @@ if __name__ == "__main__":
     sys.path.append(base_base_dir)
   __package__ = os.path.split(base_dir)[-1]
 
-from .Training.model import make_model, to_train, make_save_model, compile_model
+from .Training.model import make_model, make_input_fn, make_save_model, compile_model
 from .Training.callbacks import ModelCheckpoint
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
   parser.add_argument('--output-name', required=False, default=None, type=str)
   parser.add_argument('--gpu', required=False, default='1', type=str)
   parser.add_argument('--batch-size', required=False, type=int, default=2000)
-  parser.add_argument('--patience', required=False, type=int, default=4)
+  parser.add_argument('--patience', required=False, type=int, default=16)
   parser.add_argument('--n-epochs', required=False, type=int, default=10000)
   parser.add_argument('--dataset-train', required=False, default='/data_ssd/Run3_HLT/prod_v3_skim_v2-train', type=str)
   parser.add_argument('--dataset-val', required=False, default='/data_ssd/Run3_HLT/prod_v3_skim_v2-val', type=str)
@@ -46,6 +46,8 @@ if __name__ == "__main__":
   if args.summary_only:
     sys.exit(0)
 
+  to_train = make_input_fn(cfg['setup']['reduce_calo_precision'], cfg['setup']['reduce_center_precision'],
+                           cfg['setup']['apply_avg_pool'], cfg['setup']['concat_input'], to_train=True)
   dataset_train = tf.data.Dataset.load(args.dataset_train, compression=None)
   ds_train = dataset_train.batch(args.batch_size).map(to_train).prefetch(tf.data.AUTOTUNE)
 

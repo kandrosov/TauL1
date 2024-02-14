@@ -102,6 +102,7 @@ class Setup:
     self.model_dir = os.path.join(base_dir, self.cfg['model_dir'])
     if not os.path.exists(self.model_dir):
       raise RuntimeError(f'Model directory {self.model_dir} does not exist')
+    self.model_cfg_dir = os.path.join(base_dir, 'model.yaml')
 
     self.scores_diff_dir = os.path.join(base_dir, self.cfg['scores_diff_dir'])
 
@@ -182,8 +183,12 @@ class Setup:
       setattr(self, attr_name, file_path)
 
 
-def run_perf(cfg_path, base_dir):
+def run_perf(cfg_path, base_dir, last_step=None):
   setup = Setup(cfg_path, base_dir)
+
+  if last_step is not None:
+    if last_step not in [ 'hls_config', 'hls_convert', 'apply_training' ]:
+      raise RuntimeError(f'Unknown last step: {last_step}')
 
   has_stat_file = os.path.exists(setup.model_stat_file)
   has_summary_file = os.path.exists(setup.model_summary_file)
@@ -202,15 +207,20 @@ def run_perf(cfg_path, base_dir):
       if setup.hls4ml_config_customizations is not None:
         cmd.extend(['--customizations', setup.hls4ml_config_customizations])
       ps_call(cmd, verbose=1)
+    if last_step == 'hls_config':
+      return
     if not os.path.exists(setup.hls4ml_vivado_report_path):
       cmd = [ 'python', setup.hls4ml_convert_model_py, '--model', setup.model_dir,
               '--config', setup.hls4ml_config_path, '--output', setup.hls4ml_dir,
               '--part', setup.hls4ml_fpga_part ]
       ps_call(cmd, verbose=1)
+  if last_step in [ 'hls_convert', 'hls_config' ]:
+    return
 
   for dataset in setup.datasets.values():
     cmd_base = [ 'python', setup.apply_training_py, '--dataset', dataset.input_path, '--model', setup.model_dir,
-                 '--output', dataset.scores_path, '--batch-size', str(setup.cfg['apply_training']['batch_size']) ]
+                 '--output', dataset.scores_path, '--batch-size', str(setup.cfg['apply_training']['batch_size']),
+                 '--model-cfg', setup.model_cfg_dir]
     if setup.cfg['apply_training']['regress_pt']:
       cmd_base.append('--has-pt-node')
     if not dataset.scores_ready():
@@ -233,6 +243,8 @@ def run_perf(cfg_path, base_dir):
         scores_plot.q_limits, scores_plot.q_values = get_shortest_interval(scores_plot.delta_scores,
                                                                            alpha=scores_plot.cl)
         scores_plot.eval()
+  if last_step == 'apply_training':
+    return
 
   if setup.eval_resolution and not os.path.exists(setup.resolution_dir):
     cmd = [ 'python', setup.eval_resolution_py, '--cfg', cfg_path, '--dataset', setup.resolution_ds.input_path,
@@ -261,6 +273,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--cfg', required=True, type=str)
   parser.add_argument('--model', required=True, type=str)
+  parser.add_argument('--last-step', required=False, default=None, type=str)
   args = parser.parse_args()
 
-  run_perf(args.cfg, args.model)
+  run_perf(args.cfg, args.model, args.last_step)

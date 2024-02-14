@@ -1,4 +1,5 @@
 import awkward as ak
+from enum import Enum
 import json
 import numpy as np
 import os
@@ -9,13 +10,52 @@ from TauL1.RunKit.run_tools import print_ts
 from .eval_tools import get_pass_mask_default_or, get_pass_mask_nn, mk_sel_fn, pass_masks_to_count, \
                         get_eff, get_rate, get_tau_pass_mask_default, is_gen_tau, list_to_str, get_passed_nn
 
+class MinimizerTarget(Enum):
+  Efficiency = 1
+  Rate = 2
+
+class SolutionCompareResult(Enum):
+  Undefined = 0
+  Better = 1
+  NotBetter = 2
+
+class LUTSolution:
+  def __init__(self, lut_thrs_int, eff, rate, passed_min_limit=True, passed_counts=None):
+    self.lut_thrs_int = lut_thrs_int
+    self.eff = eff
+    self.rate = rate
+    self.passed_min_limit = passed_min_limit
+    self.passed_counts = passed_counts
+
+  def valid(self, target_rate):
+    return self.passed_min_limit and self.rate <= target_rate
+
+  def compare(self, other, target, target_rate):
+    valid = self.valid(target_rate)
+    other_valid = other.valid(target_rate)
+    if not valid:
+      if not other_valid:
+        return SolutionCompareResult.Undefined
+      return SolutionCompareResult.NotBetter
+    if not other_valid:
+      return SolutionCompareResult.Better
+
+    if target == MinimizerTarget.Efficiency:
+      if other.eff < self.eff or (other.eff == self.eff and np.sum(self.lut_thrs_int) < np.sum(other.lut_thrs_int)):
+        return SolutionCompareResult.Better
+    elif target == MinimizerTarget.Rate:
+      if other.rate > self.rate or (other.rate == self.rate and np.sum(self.lut_thrs_int) > np.sum(other.lut_thrs_int)):
+        return SolutionCompareResult.Better
+    else:
+      raise RuntimeError(f'Unknown target {target}')
+    return SolutionCompareResult.NotBetter
 
 def find_nn_thrs(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc, L1Tau_type_mc,
                  L1Tau_pt_data, L1Tau_eta_data, L1Tau_NNtag_data, L1Tau_ptReg_data,
                  sel_fn, n_nn_thrs, n_expected_taus, target_rate,
                  initial_thrs=None, extra_cond_eff=None, step=0.01, use_bfgs=False, force_monotonic_thrs=False,
                  min_passed_L1Tau_pt=None, min_passed_L1Tau_eta=None, min_passed_L1Tau_NNtag=None,
-                 min_passed_L1Tau_ptReg=None, min_passed_L1Tau_type=None, min_passed_var=None, min_passed_bins=None, min_passed_counts=None,
+                 min_passed_L1Tau_ptReg=None, min_passed_L1Tau_type=None, min_passed_var=None, min_passed_bins=None, min_passed_counts=None, target=MinimizerTarget.Efficiency,
                  verbose=0):
   n_total_data = len(L1Tau_pt_data)
   n_total_mc =len(L1Tau_pt_mc)
@@ -27,7 +67,8 @@ def find_nn_thrs(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc, L1Ta
     key = tuple(nn_thrs_int.tolist())
     if key in cache:
       eff, rate, passed_min_limit, passed_counts = cache[key]
-      return eff, rate, passed_min_limit, passed_counts
+      solution = LUTSolution(nn_thrs_int, eff, rate, passed_min_limit, passed_counts)
+      return solution
     nn_thrs = nn_thrs_int.astype(float) * step
     n_passed_mc = get_passed_nn(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc,
                                 nn_thrs, sel_fn, n_expected_taus, extra_cond=extra_cond_eff,
@@ -50,7 +91,8 @@ def find_nn_thrs(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc, L1Ta
     if verbose > 1:
       thr_int_str = '[' + ','.join([ str(x) for x in nn_thrs_int ]) + ']'
       print(f'--> thr_int={thr_int_str}, eff={eff}, rate={rate}, passed_min_limit={passed_min_limit}')
-    return eff, rate, passed_min_limit, passed_counts
+    solution = LUTSolution(nn_thrs_int, eff, rate, passed_min_limit, passed_counts)
+    return solution
 
   def align_thrs(thrs):
     if force_monotonic_thrs:
@@ -80,31 +122,34 @@ def find_nn_thrs(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc, L1Ta
     x = list(range(n_nn_thrs))
     return sorted(x, key=lambda x: -weights[x])
 
-  def minimization_step_stage1(eff, passed_counts, thr_int, state):
-    best_eff = eff
-    best_thrs = thr_int
+  def minimization_step_stage1(best_solution, state):
     has_change = False
     for thr_idx in reversed(range(n_nn_thrs)):
-      if best_thrs[thr_idx] == 0: continue
+      if target == MinimizerTarget.Efficiency and best_solution.lut_thrs_int[thr_idx] == 0: continue
+      if target == MinimizerTarget.Rate and best_solution.lut_thrs_int[thr_idx] == max_thr_int_value: continue
       if state['stage2_cnt'] == 0:
-        thr_step = best_thrs[thr_idx]
+        if target == MinimizerTarget.Efficiency:
+          thr_step = best_solution.lut_thrs_int[thr_idx]
+        else:
+          thr_step = max_thr_int_value - best_solution.lut_thrs_int[thr_idx]
       else:
         thr_step = 1
       while thr_step > 0:
-        thr_int_upd = best_thrs.copy()
-        thr_int_upd[thr_idx] = max(thr_int_upd[thr_idx] - thr_step, 0)
+        thr_int_upd = best_solution.lut_thrs_int.copy()
+        if target == MinimizerTarget.Efficiency:
+          thr_int_upd[thr_idx] = max(thr_int_upd[thr_idx] - thr_step, 0)
+        else:
+          thr_int_upd[thr_idx] = min(thr_int_upd[thr_idx] + thr_step, max_thr_int_value)
         thr_step = thr_step // 2
         align_thrs(thr_int_upd)
-        if np.array_equal(thr_int_upd, best_thrs): continue
-        eff_upd, rate_upd, passed_min_limit_upd, passed_counts_upd = get_eff_rate(thr_int_upd)
-        if rate_upd > target_rate or not passed_min_limit_upd: continue
-        if best_eff < eff_upd or (best_eff == eff_upd and np.sum(thr_int_upd) < np.sum(best_thrs)):
-          best_eff = eff_upd
-          best_thrs = thr_int_upd
+        if np.array_equal(thr_int_upd, best_solution.lut_thrs_int): continue
+        solution_upd = get_eff_rate(thr_int_upd)
+        if solution_upd.compare(best_solution, target, target_rate) == SolutionCompareResult.Better:
+          best_solution = solution_upd
           has_change = True
-    return has_change, best_thrs
+    return has_change, best_solution.lut_thrs_int
 
-  def minimization_step_stage2(eff, rate, thr_int, state):
+  def minimization_step_stage2(best_solution, state):
     state['stage2_cnt'] += 1
     range_ref = get_range(state['ref_weights'])
     range_alt = get_range(state['alt_weights'])
@@ -112,81 +157,80 @@ def find_nn_thrs(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc, L1Ta
       print(f'---> range_ref={range_ref}')
       print(f'---> range_alt={range_alt}')
     for thr_idx_ref in range_ref:
-      if thr_int[thr_idx_ref] == 0: continue
       thr_step_ref = 1
-      eff_upd_ref = 0
-      while thr_int[thr_idx_ref] - thr_step_ref >= 0:
-        thr_int_upd = thr_int.copy()
-        thr_int_upd[thr_idx_ref] -= thr_step_ref
+      def while_cond_up(lut_thr, step):
+        return lut_thr + step <= max_thr_int_value
+      def while_cond_down(lut_thr, step):
+        return lut_thr - step >= 0
+      def max_step_down(lut_thr):
+        return lut_thr
+      def max_step_up(lut_thr):
+        return max_thr_int_value - lut_thr
+
+      if target == MinimizerTarget.Efficiency:
+        desired_thr = 0
+        step_sign = -1
+        max_step_ref = max_step_down
+        max_step_second = max_step_up
+        while_cond_ref = while_cond_down
+        while_cond_second = while_cond_up
+        def check_ref_solution(ref_solution):
+          return ref_solution.eff > best_solution.eff
+      else:
+        desired_thr = max_thr_int_value
+        step_sign = +1
+        max_step_ref = max_step_up
+        max_step_second = max_step_down
+        while_cond_ref = while_cond_up
+        while_cond_second = while_cond_down
+        def check_ref_solution(ref_solution):
+          return ref_solution.rate < best_solution.rate
+      def max_min(step, lut_thr, max_step):
+        return max(min(step * 2, max_step(lut_thr)), step + 1)
+      if best_solution.lut_thrs_int[thr_idx_ref] == desired_thr: continue
+      while while_cond_ref(best_solution.lut_thrs_int[thr_idx_ref], thr_step_ref):
+        thr_int_upd = best_solution.lut_thrs_int.copy()
+        thr_int_upd[thr_idx_ref] += step_sign * thr_step_ref
         align_thrs(thr_int_upd)
-        if np.array_equal(thr_int_upd, thr_int):
+        if np.array_equal(thr_int_upd, best_solution.lut_thrs_int):
           break
         if verbose > 1:
           print(f'---> thr_idx_ref={thr_idx_ref} thr_step_ref={thr_step_ref}')
-        eff_upd_ref, _, _, _ = get_eff_rate(thr_int_upd)
-        if eff_upd_ref > eff:
+        solution_ref = get_eff_rate(thr_int_upd)
+        if check_ref_solution(solution_ref):
           break
         if thr_step_ref < 4:
           thr_step_ref += 1
         else:
-          thr_step_ref = max(min(thr_step_ref * 2, thr_int[thr_idx_ref]), thr_step_ref + 1)
-      if eff_upd_ref <= eff: continue
+          thr_step_ref = max_min(thr_step_ref, best_solution.lut_thrs_int[thr_idx_ref], max_step_ref)
+      if not check_ref_solution(solution_ref): continue
       for thr_idx in range_alt:
         if thr_idx == thr_idx_ref: continue
         thr_step = 1
         passed_min_upd = True
-        while thr_int[thr_idx] + thr_step <= max_thr_int_value and passed_min_upd:
+        while while_cond_second(best_solution.lut_thrs_int[thr_idx], thr_step) and passed_min_upd:
           thr_step_ref_upd = thr_step_ref
-          best_eff_upd = eff
-          best_thr_int_upd = thr_int
-          thr_int_upd_prev = thr_int
-          while thr_int_upd[thr_idx_ref] - thr_step_ref_upd >= 0:
+          best_solution_upd = best_solution
+          thr_int_upd_prev = best_solution.lut_thrs_int
+          while while_cond_ref(thr_int_upd[thr_idx_ref], thr_step_ref_upd):
             thr_int_upd = thr_int.copy()
-            thr_int_upd[thr_idx_ref] -= thr_step_ref_upd
-            thr_int_upd[thr_idx] += thr_step
+            thr_int_upd[thr_idx_ref] += step_sign * thr_step_ref_upd
+            thr_int_upd[thr_idx] -= step_sign * thr_step
             align_thrs(thr_int_upd)
             if np.array_equal(thr_int_upd, thr_int_upd_prev): break
             thr_int_upd_prev = thr_int_upd
             if verbose > 1:
               print(f'---> thr_idx_ref={thr_idx_ref} thr_step_ref={thr_step_ref_upd}'
                     f' thr_idx={thr_idx} thr_step={thr_step}')
-            thr_step_ref_upd = max(min(thr_step_ref_upd * 2, thr_int_upd[thr_idx_ref]), thr_step_ref_upd + 1)
-            eff_upd, rate_upd, passed_min_upd, _ = get_eff_rate(thr_int_upd)
-            if rate_upd > target_rate or not passed_min_upd: break
-            if eff_upd > best_eff_upd or (eff_upd == best_eff_upd and np.sum(thr_int_upd) < np.sum(best_thr_int_upd)):
-              best_eff_upd = eff_upd
-              best_thr_int_upd = thr_int_upd
-          if best_eff_upd > eff or np.sum(best_thr_int_upd) < np.sum(thr_int):
-            return True, best_thr_int_upd
-          thr_step = max(min(thr_step * 2, max_thr_int_value - thr_int[thr_idx]), thr_step + 1)
-    return False, thr_int
-
-  def minimization_step_bfgs(eff, rate, thr_int, state):
-    best_eff = eff
-    best_thrs = thr_int
-    has_change = False
-    def loss_fn(nn_thrs):
-      nonlocal best_eff, best_thrs, has_change
-      nn_thrs_int = (np.array(nn_thrs, dtype=float) / step).astype(int)
-      align_thrs(nn_thrs_int)
-      eff, rate, _, _ = get_eff_rate(nn_thrs_int)
-      loss = -eff
-      if rate > target_rate:
-        loss += rate / target_rate - 1
-      elif best_eff < eff or (best_eff == eff and np.sum(nn_thrs_int) < np.sum(best_thrs)):
-        best_eff = eff
-        best_thrs = nn_thrs_int
-        has_change = True
-        if verbose > 1:
-          thr_int_str = '[' + ','.join([ str(x) for x in thr_int ]) + ']'
-          print(f'-> thr_int={thr_int_str}, eff={eff}, rate={rate}')
-      return loss
-
-    bounds = [ (-step, 1 + step) ] * n_nn_thrs
-    x0 = thr_int.astype(float) * step
-
-    scipy.optimize.minimize(loss_fn, x0, method='L-BFGS-B', bounds=bounds, options={ 'eps': step })
-    return has_change, best_thrs
+            thr_step_ref_upd = max_min(thr_step_ref_upd, thr_int_upd[thr_idx_ref], max_step_ref)
+            solution_upd = get_eff_rate(thr_int_upd)
+            if not solution_upd.valid(target_rate): break
+            if solution_upd.compare(best_solution_upd, target, target_rate) == SolutionCompareResult.Better:
+              best_solution_upd = solution_upd
+          if best_solution_upd.compare(best_solution, target, target_rate) == SolutionCompareResult.Better:
+            return True, best_solution_upd.lut_thrs_int
+          thr_step = max_min(thr_step, thr_int[thr_idx], max_step_second)
+    return False, best_solution.lut_thrs_int
 
   has_change = True
   if initial_thrs is None:
@@ -201,20 +245,20 @@ def find_nn_thrs(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc, L1Ta
       min_notpassed = None
       max_allowed = max_thr_int_value
       while True:
-        eff, rate, passed_min_limit, passed_counts = get_eff_rate(thr_int)
+        solution = get_eff_rate(thr_int)
         if verbose > 0:
-          msg = f'thr_int={list_to_str(thr_int)}, eff={eff}, rate={rate}, cache_size={len(cache)}'
-          if passed_counts is not None:
-            delta = passed_counts - min_passed_counts
+          msg = f'thr_int={list_to_str(thr_int)}, eff={solution.eff}, rate={solution.rate}, cache_size={len(cache)}'
+          if solution.passed_counts is not None:
+            delta = solution.passed_counts - min_passed_counts
             msg += f', passed_counts_delta={list_to_str(delta)}'
           print_ts(msg)
-        if not passed_min_limit:
+        if not solution.passed_min_limit:
           min_notpassed = thr_int[idx] if min_notpassed is None else min(min_notpassed, thr_int[idx])
         else:
           max_passed = thr_int[idx] if max_passed is None else max(thr_int[idx], max_passed)
-        if passed_min_limit and rate <= target_rate: break
+        if solution.passed_min_limit and solution.rate <= target_rate: break
         if max_passed is not None and (max_passed == max_allowed or max_passed+1 == min_notpassed):
-          if passed_min_limit: break
+          if solution.passed_min_limit: break
           new_value = max_passed
         else:
           if min_notpassed is None:
@@ -229,28 +273,23 @@ def find_nn_thrs(L1Tau_pt_mc, L1Tau_eta_mc, L1Tau_NNtag_mc, L1Tau_ptReg_mc, L1Ta
         if new_value == thr_int[idx]:
           raise RuntimeError(f'Failed to find new threshold for idx={idx}')
         thr_int[idx] = new_value
-      if rate <= target_rate: break
-    if rate > target_rate:
+      if solution.rate <= target_rate: break
+    if solution.rate > target_rate:
       raise RuntimeError('Unable to find thresholds with rate <= target_rate')
     if verbose > 1:
       print('opt stage 1 ...')
-    has_change, thr_int_upd = minimization_step_stage1(eff, passed_counts, thr_int, state)
+    has_change, thr_int_upd = minimization_step_stage1(solution, state)
     if not has_change:
-      if use_bfgs:
-        if verbose > 1:
-          print('opt stage bfgs ...')
-        has_change, thr_int_upd = minimization_step_bfgs(eff, rate, thr_int, state)
-      if not has_change:
-        if verbose > 1:
-          print('opt stage 2 ...')
-        has_change, thr_int_upd = minimization_step_stage2(eff, rate, thr_int, state)
+      if verbose > 1:
+        print('opt stage 2 ...')
+      has_change, thr_int_upd = minimization_step_stage2(solution, state)
     diff = thr_int_upd - thr_int
     state = update_state(state, diff)
     thr_int = thr_int_upd
 
-  best_eff, best_rate, _, _ = get_eff_rate(thr_int)
-  best_nn_thrs = thr_int.astype(float) * step
-  return best_eff, best_rate, best_nn_thrs
+  best_solution = get_eff_rate(thr_int)
+  best_nn_thrs = best_solution.lut_thrs_int.astype(float) * step
+  return best_solution.eff, best_solution.rate, best_nn_thrs
 
 class Algorithm:
   def __init__(self, name, cfg, algo_params_dir, datasets, lut_bins):
@@ -287,8 +326,15 @@ class Algorithm:
             self.thresholds_opt['dataset_rate'] = datasets[opt['dataset_rate']]
             self.thresholds_opt['extra_algos_eff'] = opt.get('extra_algos_eff', [])
             self.thresholds_opt['target_rate'] = opt['target_rate']
-            self.thresholds_opt['initial_thresholds'] = opt.get('initial_thresholds', None)
+            thrs = opt.get('initial_thresholds', None)
+            if type(thrs) == list:
+              thrs = np.array(thrs, dtype=np.float32)
+            self.thresholds_opt['initial_thresholds'] = thrs
+
             self.thresholds_opt['step'] = opt.get('step', 0.01)
+            target_str = opt.get('target', 'Efficiency')
+            self.thresholds_opt['target'] = MinimizerTarget[target_str]
+
             if 'tau_eff_var' in opt:
               self.thresholds_opt['tau_eff_var'] = (opt['tau_eff_var'], opt['tau_eff_dataset'], opt['tau_eff_algo'])
               self.thresholds_opt['tau_eff_scale'] = opt.get('tau_eff_scale', 1.)
@@ -324,10 +370,12 @@ class Algorithm:
     if self.initialized or self.is_composite:
       return
     if self.algo == 'nn':
-      self.thresholds_opt['target_rate'] = variables.get(var_name='rate', algo_name=self.thresholds_opt['target_rate'])
+      if type(self.thresholds_opt['target_rate']) != float:
+        self.thresholds_opt['target_rate'] = variables.get(var_name='rate', algo_name=self.thresholds_opt['target_rate'])
       self.thresholds_opt['extra_algos_eff'] = \
         { algo_name: algos[algo_name] for algo_name in self.thresholds_opt['extra_algos_eff'] }
-      if self.thresholds_opt['initial_thresholds'] is not None:
+      if self.thresholds_opt['initial_thresholds'] is not None \
+        and type(self.thresholds_opt['initial_thresholds']) != np.ndarray:
         self.thresholds_opt['initial_thresholds'] = algos[self.thresholds_opt['initial_thresholds']]
       if self.thresholds_opt['tau_eff_var'] is not None:
         var_name, ds_name, algo_name = self.thresholds_opt['tau_eff_var']
@@ -463,12 +511,13 @@ class Algorithm:
       min_passed_args['min_passed_L1Tau_type'] = tau_eff_var.dataset['L1Tau_type']
       min_passed_args['min_passed_var'] = tau_eff_var.dataset[tau_eff_var.column]
       min_passed_args['min_passed_bins'] = tau_eff_var.bins
-      #min_passed_args['min_passed_counts'] = np.ce(np.histogram(tau_passed, bins=tau_eff_var.bins)[0] * 0.95)
       min_passed_counts = np.histogram(tau_passed, bins=tau_eff_var.bins)[0]
       tau_eff_scale = self.thresholds_opt['tau_eff_scale']
       if tau_eff_scale != 1:
         min_passed_counts = np.ceil(min_passed_counts * tau_eff_scale)
       min_passed_args['min_passed_counts'] = np.array(min_passed_counts, dtype=int)
+
+    target = self.thresholds_opt['target']
 
     eff, rate, nn_thrs = find_nn_thrs(ds_eff['L1Tau_pt'], ds_eff['L1Tau_eta'], ds_eff[self.nn_var],
                                       ds_eff['L1Tau_ptReg'], ds_eff['L1Tau_type'],
@@ -477,7 +526,7 @@ class Algorithm:
                                       n_nn_thrs, self.n_taus, self.thresholds_opt['target_rate'],
                                       initial_thrs=self.thresholds_opt['initial_thresholds'],
                                       extra_cond_eff=extra_cond_eff, step=self.thresholds_opt['step'], verbose=1,
-                                      **min_passed_args)
+                                      target=target, **min_passed_args)
     thrs_str = ', '.join([ f'{thr:.2f}' for thr in nn_thrs ])
     print(f'Optimized thresholds for {self.name}: eff={eff}, rate={rate}, thrs=[{thrs_str}]')
     self.set_thresholds(nn_thrs)

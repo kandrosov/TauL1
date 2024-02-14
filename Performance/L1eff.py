@@ -8,7 +8,8 @@ def ListToVector(list, type="string"):
 		vec.push_back(item)
 	return vec
 
-headers_dir = os.path.dirname(os.path.abspath(__file__))
+file_dir = os.path.dirname(os.path.abspath(__file__))
+headers_dir = os.path.join(file_dir, '..', 'Production')
 for header in [ 'GenLepton.h' ]:
   header_path = os.path.join(headers_dir, header)
   if not ROOT.gInterpreter.Declare(f'#include "{header_path}"'):
@@ -42,7 +43,7 @@ T1 DeltaR(T1 eta1, T1 phi1, T2 eta2, T2 phi2){
 }
 ''')
 
-sample_path = "/home/valeria/TauL1/GluGluHToTauTau_M-125"
+sample_path = "/data2/Run3_HLT/prod_v3/GluGlutoHHto2B2Tau_kl-1p00_kt-1p00_c2-0p00"
 files = '*.root'
 #files = 'nano_2.root'
 df = ROOT.RDataFrame("Events", os.path.join(sample_path, files))
@@ -142,5 +143,5 @@ legend.AddEntry(eff, "L1 #tau", "F")
 legend.AddEntry(eff_iso, "iso L1 #tau", "F")
 legend.Draw()
 
-canvas.SaveAs("genTau_pt_eff.pdf")
+canvas.SaveAs("output/genTau_pt_eff.pdf")
 

@@ -6,8 +6,10 @@ from numba import njit
 import awkward as ak
 import numpy as np
 import shutil
+import yaml
 
 os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+import tensorflow as tf
 
 if __name__ == "__main__":
   file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +18,7 @@ if __name__ == "__main__":
 
 from TauL1.Performance.model_tools import load_model
 from TauL1.hls4ml.load_model import load_hls4ml_model
+from TauL1.Training.model import make_input_fn
 
 @njit
 def fill_taus(tau_data, index, var_values):
@@ -56,7 +59,7 @@ tau_vars = [ 'L1Tau_hwPt', 'L1Tau_towerIEta' ]
 
 all_vars = tau_vars + tower_vars
 
-def get_inputs(columns):
+def get_inputs(columns, input_fn):
 
   ref_column = columns[tau_vars[0]]
   n_phi = 9
@@ -71,11 +74,12 @@ def get_inputs(columns):
     fill_taus(tau_data, i, columns[var])
   fill_towers(tower_data, counts, columns['L1TauTowers_tauIdx'], columns['L1TauTowers_relEta'],
               columns['L1TauTowers_relPhi'], columns['L1TauTowers_hwEtEm'], columns['L1TauTowers_hwEtHad'])
+  tau_data_tf = tf.convert_to_tensor(tau_data, dtype=tf.float32)
+  tower_data_tf = tf.convert_to_tensor(tower_data, dtype=tf.float32)
+  inputs = input_fn(tower_data_tf, tau_data_tf)
+  return counts, inputs
 
-  center_data = np.ascontiguousarray(tower_data[:, 2:4, 3:6, :])
-  return counts, tau_data, tower_data, center_data
-
-def apply_training(dataset_path, model, output_file, batch_size, has_pt_node=False, is_hls4ml=False):
+def apply_training(dataset_path, model, cfg, output_file, batch_size, has_pt_node=False, is_hls4ml=False):
   output_dir = os.path.dirname(output_file)
   if len(output_dir) > 0 and not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -85,6 +89,10 @@ def apply_training(dataset_path, model, output_file, batch_size, has_pt_node=Fal
   if os.path.exists(output_file_tmp):
     os.remove(output_file_tmp)
 
+  input_fn = make_input_fn(cfg['setup']['reduce_calo_precision'], cfg['setup']['reduce_center_precision'],
+                           cfg['setup']['apply_avg_pool'], cfg['setup']['concat_input'], to_train=False,
+                           to_numpy=is_hls4ml)
+
   print('Loading inputs')
 
   file = uproot.open(dataset_path)
@@ -93,8 +101,7 @@ def apply_training(dataset_path, model, output_file, batch_size, has_pt_node=Fal
     with tqdm(total=events.num_entries) as pbar:
       for columns in events.iterate(all_vars, step_size=batch_size):
         n_evt = len(columns[tau_vars[0]])
-        counts, tau_data, tower_data, center_data = get_inputs(columns)
-        inputs = (tower_data, tau_data, center_data)
+        counts, inputs = get_inputs(columns, input_fn)
         if is_hls4ml:
           pred = model.predict(inputs)
           suffix = '_q'
@@ -119,7 +126,6 @@ def apply_training(dataset_path, model, output_file, batch_size, has_pt_node=Fal
           'L1Tau_ptReg' + suffix: pt_reg,
         }
 
-
         if 'Events' in out_file:
           out_file['Events'].extend(data)
         else:
@@ -134,6 +140,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('--dataset', required=True, type=str)
   parser.add_argument('--model', required=True, type=str)
+  parser.add_argument('--model-cfg', required=True, type=str)
   parser.add_argument('--output', required=True, type=str)
   parser.add_argument('--batch-size', required=False, type=int, default=2500)
   parser.add_argument('--use-hls4ml', action='store_true')
@@ -153,4 +160,7 @@ if __name__ == "__main__":
   else:
     model = load_model(args.model)
 
-  apply_training(args.dataset, model, args.output, args.batch_size, args.has_pt_node, args.use_hls4ml)
+  with open(args.model_cfg) as f:
+    cfg = yaml.safe_load(f)
+
+  apply_training(args.dataset, model, cfg, args.output, args.batch_size, args.has_pt_node, args.use_hls4ml)

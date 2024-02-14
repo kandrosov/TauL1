@@ -19,7 +19,7 @@ def load_hls4ml_model(model_path, config_path, fpga_part=None, output_path=None,
   with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
   model = hls4ml.converters.convert_from_keras_model(model, hls_config=config, output_dir=output_path,
-                                                     part=fpga_part, backend='Vivado')
+                                                     part=fpga_part, backend='Vivado', clock_period=4.2)
   if compile:
     model.compile()
   return model
