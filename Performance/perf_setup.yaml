@@ -157,9 +157,9 @@ plots:
         # - algo: reco_2tau_25
         #   title: "$p_T\\geq 25$ GeV @120.3kHz"
         #   color: "#808080"
-        - algo: reco_2tau_34
-          title: "$p_T\\geq 34$ GeV @20.3kHz"
-          color: "#929591"
+        # - algo: reco_2tau_34
+        #   title: "$p_T\\geq 34$ GeV @20.3kHz"
+        #   color: "#929591"
         - algo: default_2tau
           title: "$p_T\\geq 34$ GeV && L1 iso @9.8kHz"
           color: k
@@ -178,15 +178,25 @@ plots:
         # - algo: nn_2tau_rate_90_95
         #   title: "$p_T\\geq 25$ GeV && ShallowTau rate tune v3 @6.5kHz"
         #   color: r
+      ditau_v2:
+        - algo: default_2tau
+          title: "($\\geq 2 \\tau_h$ $p_T\\geq 34$ GeV && L1 iso) OR ($\\geq 2 \\tau_h$ $p_T\\geq 70$ GeV)"
+          color: k
+        - algo: default_2tau_no70
+          title: "$\\geq 2 \\tau_h$ $p_T\\geq 34$ GeV && L1 iso"
+          color: r
       ditau_HT_v1:
         - algo: default_2tau_HT
-          title: "L1_DoubleIsoTau34er2p1"
+          title: "$p_T\\geq 34$ GeV && L1 iso @9.8kHz"
           color: k
+        - algo: default_2tau_36_HT
+          title: "$p_T\\geq 36$ GeV && L1 iso @8.3kHz"
+          color: "#808080"
         - algo: nn_2tau_eff_HT
-          title: "ShallowTau (eff tune)"
+          title: "$p_T\\geq 25$ GeV && ShallowTau eff tune @9.8kHz"
           color: y
         - algo: nn_2tau_rate_HT
-          title: "ShallowTau (rate tune)"
+          title: "$p_T\\geq 25$ GeV && ShallowTau rate tune v1 @8.2kHz"
           color: b
   efficiency_1tau:
     datasets: [ HH_1tau ]
@@ -219,6 +229,10 @@ algorithms:
     n_taus: 2
     pt_iso_thr: 34
     pt_noiso_thr: 70
+  default_2tau_no70:
+    algo: default
+    n_taus: 2
+    pt_iso_thr: 34
   default_2tau_36:
     algo: default
     n_taus: 2
@@ -335,6 +349,11 @@ algorithms:
     algo: composite
     sub_algos:
       - default_2tau
+      - L1_HT
+  default_2tau_36_HT:
+    algo: composite
+    sub_algos:
+      - default_2tau_36
       - L1_HT
   nn_2tau_eff_HT:
     algo: composite
